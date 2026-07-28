@@ -215,16 +215,72 @@
   .confirm-card{background:var(--card); border-radius:14px; padding:22px 24px; max-width:410px; width:100%; box-shadow:0 20px 60px rgba(0,0,0,.45);}
   .confirm-card .msg{font-size:14px; margin-bottom:20px; color:var(--ink); line-height:1.55;}
   .confirm-card .row{display:flex; justify-content:flex-end; gap:10px;}
+
+  /* Session name in appbar */
+  .session-name{margin-left:12px; padding-left:12px; border-left:1px solid rgba(255,255,255,.25); font-weight:500; font-size:13px; opacity:.9;}
+  .session-name:empty{display:none;}
+  .btn-share{background:var(--accent,#378ADD); color:#fff; border:none; padding:7px 12px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer;}
+  .btn-share:hover{filter:brightness(1.05);}
+
+  /* User menu dropdown */
+  .user-wrap{position:relative;}
+  .user-menu{position:absolute; right:0; top:calc(100% + 8px); background:var(--card); border:1px solid var(--line); border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.22); padding:8px; min-width:230px; z-index:60;}
+  .um-head{display:flex; align-items:center; gap:8px; padding:6px 8px 10px; font-weight:600; color:var(--ink); border-bottom:1px solid var(--line); margin-bottom:6px;}
+  .um-item{display:block; width:100%; text-align:left; background:none; border:none; padding:9px 8px; border-radius:8px; font-size:13px; color:var(--ink); cursor:pointer;}
+  .um-item:hover{background:var(--bg);}
+  .um-label{font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; padding:8px 8px 4px;}
+  .um-themes{display:grid; grid-template-columns:1fr 1fr; gap:6px; padding:2px 6px 6px;}
+  .um-theme{border:1px solid var(--line); background:var(--bg); color:var(--ink); border-radius:7px; padding:7px 8px; font-size:12px; cursor:pointer;}
+  .um-theme.sel{border-color:var(--accent,#378ADD); box-shadow:0 0 0 1px var(--accent,#378ADD) inset; font-weight:600;}
+  .um-sep{height:1px; background:var(--line); margin:6px 0;}
+
+  /* Lobby */
+  .lobby-card{background:var(--card); border-radius:18px; box-shadow:0 20px 60px rgba(0,0,0,.25); width:min(680px,92vw); max-height:90vh; overflow:auto; padding:26px 28px;}
+  .lobby-top{display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:20px;}
+  .lobby-me{display:flex; align-items:center; gap:8px; background:var(--bg); border:1px solid var(--line); border-radius:999px; padding:6px 10px 6px 8px; font-size:13px;}
+  .lobby-create{background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:20px;}
+  .lobby-create h3, .lobby-list h3{margin:0 0 12px; font-size:14px;}
+  .lobby-create-row{display:flex; gap:8px; flex-wrap:wrap;}
+  .lobby-create-row input{flex:2; min-width:180px;}
+  .lobby-create-row select{flex:1; min-width:150px;}
+  .lobby-list-hd{display:flex; align-items:center; justify-content:space-between;}
+  .muted-note{font-size:12px; color:var(--muted); margin:10px 0 0; line-height:1.5;}
+  .sess-row{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 14px; border:1px solid var(--line); border-radius:10px; margin-bottom:8px; background:var(--bg);}
+  .sess-name{font-weight:600; font-size:13px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  .sess-sub{font-size:11px; color:var(--muted); margin-top:3px;}
+  @media(max-width:560px){ .lobby-create-row{flex-direction:column;} .lobby-create-row input,.lobby-create-row select,.lobby-create-row button{width:100%;} }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 <h1 class="sr-only">Sprint planning poker for ServiceNow agile management</h1>
 
+<div class="overlay" id="lobby" style="display:none;">
+  <div class="lobby-card">
+    <div class="lobby-top">
+      <div><h2 style="margin:0;">Sprint Planning Poker</h2><p class="sub" style="margin:4px 0 0;">ServiceNow · Motorhub</p></div>
+      <div class="lobby-me" id="lobby-me"></div>
+    </div>
+    <div class="lobby-create">
+      <h3>Start a new session</h3>
+      <div class="lobby-create-row">
+        <input type="text" id="lobby-sess-name" placeholder="Session name (e.g. Sprint 11 planning)" maxlength="60" />
+        <select id="lobby-sprint"></select>
+        <button class="btn btn-primary" onclick="createSessionFromLobby()">Create &amp; host</button>
+      </div>
+      <p class="muted-note">You’ll be the <strong>facilitator</strong>. Share the join link with your team — they join as players, no login needed.</p>
+    </div>
+    <div class="lobby-list">
+      <div class="lobby-list-hd"><h3>Sessions</h3><button class="btn-ghost-ai" onclick="refreshLobbySessions()">↻ Refresh</button></div>
+      <div id="lobby-sessions"></div>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="join">
   <div class="join-card">
-    <h2>Join the planning session</h2>
-    <p class="sub">Motor Sprint 11 · ServiceNow Motorhub · joining via shared link</p>
+    <h2>Your player card</h2>
+    <p class="sub">Set how the table sees you</p>
     <div class="preview">
       <div class="pv-av" id="pv-av">🐭</div>
       <div>
@@ -238,27 +294,24 @@
     <div class="swatches" id="emoji-row"></div>
     <label class="fld">Color</label>
     <div class="color-row" id="color-row"></div>
-    <button class="btn btn-primary" style="width:100%; padding:11px;" id="join-btn" onclick="joinSession()" disabled>Join session</button>
+    <button class="btn btn-primary" style="width:100%; padding:11px;" id="join-btn" onclick="joinSession()" disabled>Continue</button>
   </div>
 </div>
 
 <header class="appbar" style="display:none;" id="appbar">
-  <div class="brand"><span class="logo">♠</span> Sprint Planning Poker</div>
+  <div class="brand"><span class="logo">♠</span> Sprint Planning Poker<span class="session-name" id="session-name"></span></div>
   <div class="right">
     <span class="sync" id="live-status"><span class="dot"></span> ServiceNow · Motorhub</span>
-    <select class="theme-select" id="theme" onchange="setTheme(this.value)">
-      <option value="cream">Cream</option>
-      <option value="light">Light</option>
-      <option value="dark">Dark</option>
-      <option value="midnight">Midnight</option>
-      <option value="forest">Forest</option>
-      <option value="sunset">Sunset</option>
-    </select>
+    <button id="share-btn" class="btn btn-share" onclick="openShare()" style="display:none;">🔗 Share link</button>
     <button id="role-chip" class="role-chip player" onclick="roleChipClick()">👤 Player</button>
     <button class="iconbtn" id="gear-btn" onclick="openAdmin()" title="Admin · ServiceNow integration" aria-label="Admin settings" style="display:none;">⚙</button>
-    <div class="userchip" id="userchip" onclick="editIdentity()" title="Edit your name and avatar">
-      <div class="avatar" id="chip-av" style="width:28px;height:28px;border-width:1px;font-size:16px;">🐭</div>
-      <span class="nm" id="chip-name">You</span>
+    <div class="user-wrap">
+      <div class="userchip" id="userchip" onclick="toggleUserMenu()" title="Your options">
+        <div class="avatar" id="chip-av" style="width:28px;height:28px;border-width:1px;font-size:16px;">🐭</div>
+        <span class="nm" id="chip-name">You</span>
+        <span style="font-size:10px; opacity:.6;">▾</span>
+      </div>
+      <div class="user-menu" id="user-menu" style="display:none;"></div>
     </div>
   </div>
 </header>
@@ -340,11 +393,7 @@
         <input type="text" id="adm-link" readonly style="flex:1;" />
         <button class="btn" onclick="copyLink()">Copy</button>
       </div>
-      <p style="font-size:11px; color:var(--muted); margin:8px 0 0;">Players join through this link with just a name and avatar — no login required. Admin settings stay behind the credentials below.</p>
-      <label class="fld" for="adm-admuser" style="margin-top:12px;">Admin username</label>
-      <input type="text" id="adm-admuser" placeholder="admin" />
-      <label class="fld" for="adm-admpass" style="margin-top:12px;">Admin password</label>
-      <input type="password" id="adm-admpass" placeholder="••••••••" />
+      <p style="font-size:11px; color:var(--muted); margin:8px 0 0;">Players join through this link with just a name and avatar — no login required. You’re the facilitator because you created this session.</p>
     </div>
 
     <div class="row" style="margin-top:6px;">
@@ -354,19 +403,15 @@
   </div>
 </div>
 
-<div class="confirm-ov" id="adminlogin-ov" style="display:none;">
-  <div class="confirm-card" style="max-width:380px;">
-    <h2 style="margin:0 0 4px; font-size:18px;">Facilitator sign in</h2>
-    <p style="font-size:12px; color:var(--muted); margin:0 0 16px;">Sign in to run the round and manage integration settings. Players don't need this — they join via the shared link. <br>Default: admin / admin123</p>
-    <label class="fld" for="adm-login-user">Username</label>
-    <input type="text" id="adm-login-user" placeholder="admin" />
-    <label class="fld" for="adm-login-pass" style="margin-top:12px;">Password</label>
-    <input type="password" id="adm-login-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')loginAdmin()" />
-    <div id="adm-login-err" style="color:var(--warn); font-size:12px; margin-top:10px; min-height:14px;"></div>
-    <div class="row" style="margin-top:14px;">
-      <button class="btn" onclick="closeAdminLogin()">Cancel</button>
-      <button class="btn btn-primary" onclick="loginAdmin()">Sign in</button>
+<div class="confirm-ov" id="share-ov" style="display:none;">
+  <div class="confirm-card" style="max-width:460px;">
+    <h2 style="margin:0 0 4px; font-size:18px;">🔗 Invite your team</h2>
+    <p style="font-size:12px; color:var(--muted); margin:0 0 14px;">Send this link to participants — they join this session as players, no login needed. You stay the facilitator.</p>
+    <div style="display:flex; gap:8px;">
+      <input type="text" id="share-link" readonly style="flex:1;" />
+      <button class="btn btn-primary" onclick="copyShareFromModal()">Copy</button>
     </div>
+    <div class="row" style="margin-top:16px;"><button class="btn" onclick="closeShare()">Done</button></div>
   </div>
 </div>
 
@@ -396,19 +441,20 @@ let others = {};        /* id -> {id,name,initials,emoji,color,isAdmin,voted} */
 let revealedVotes = {}; /* id -> pick value, populated only on reveal */
 let facilitatorId = null;
 
-function roomId(){
-  try{ return new URL(location.href).searchParams.get('session') || 'motorhub-sprint11'; }
-  catch(e){ return 'motorhub-sprint11'; }
+function getClient(){
+  if(!sbClient && RT_ENABLED){ try{ sbClient=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY); }catch(e){ console.error('Supabase init failed',e); } }
+  return sbClient;
 }
+function roomId(){ return currentSessionId || 'lobby'; }
 function myPresence(){
   return { id:myId, name:me.name, initials:me.initials, emoji:me.emoji, color:me.color, isAdmin:!!isAdmin, voted:!!submitted };
 }
 function ensureRealtime(){
   if(!RT_ENABLED){ updateLiveStatus(); return; }
   if(chan){ updatePresence(); return; }
+  const c=getClient(); if(!c){ updateLiveStatus(); return; }
   try{
-    sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    chan = sbClient.channel('pp-'+roomId(), { config:{ presence:{ key:myId } } });
+    chan = c.channel('pp-'+roomId(), { config:{ presence:{ key:myId } } });
     chan.on('presence', { event:'sync' }, rebuildPresence);
     chan.on('broadcast', { event:'state' }, ({payload})=>applyState(payload));
     chan.on('broadcast', { event:'reveal-vote' }, ({payload})=>{ revealedVotes[payload.id]=payload.pick; if(currentStory) renderRoom(); });
@@ -487,6 +533,47 @@ function updateLiveStatus(){
   el.innerHTML=`<span class="dot"></span> Live · ${n} in room`;
 }
 
+/* ============================================================
+   Sessions, lobby & host model
+   - A "session" is a room with a shareable link (?session=<id>).
+   - Whoever CREATES a session is its facilitator (host): we store a private
+     host token in localStorage; the shared player link never carries it, so
+     players can't become facilitator. This replaces the old shared password.
+   - The list of sessions is persisted in a Supabase table so the whole team
+     sees active/completed sessions (see setup SQL in README).
+   ============================================================ */
+function urlSession(){ try{ return new URL(location.href).searchParams.get('session'); }catch(e){ return null; } }
+function setUrlSession(id){ try{ const u=new URL(location.href); u.searchParams.set('session',id); history.replaceState(null,'',u); }catch(e){} }
+function clearUrlSession(){ try{ const u=new URL(location.href); u.searchParams.delete('session'); history.replaceState(null,'',u); }catch(e){} }
+function playerLink(id){ try{ const u=new URL(location.href); u.search=''; u.searchParams.set('session',id||currentSessionId); return u.toString(); }catch(e){ return location.origin+location.pathname+'?session='+(id||currentSessionId); } }
+
+function hostKey(id){ return 'pp_host_'+id; }
+function isHostOf(id){ try{ return !!localStorage.getItem(hostKey(id)); }catch(e){ return false; } }
+function claimHost(id){ try{ localStorage.setItem(hostKey(id), (window.crypto&&crypto.randomUUID)?crypto.randomUUID():'h'+Math.random().toString(36).slice(2)); }catch(e){} }
+function slugify(s){ return (s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,32) || 'session'; }
+function newSessionId(name){ return slugify(name)+'-'+Math.random().toString(36).slice(2,7); }
+
+/* ---- Supabase 'sessions' table helpers (degrade gracefully if absent) ---- */
+async function dbListSessions(){
+  const c=getClient(); if(!c) return {data:[],error:'offline'};
+  try{ const r=await c.from('sessions').select('*').order('created_at',{ascending:false}).limit(60); return r; }
+  catch(e){ return {data:[],error:e}; }
+}
+async function dbCreateSession(rec){
+  const c=getClient(); if(!c) return {error:'offline'};
+  try{ return await c.from('sessions').insert(rec); }catch(e){ return {error:e}; }
+}
+async function dbUpdateSession(id, fields){
+  const c=getClient(); if(!c) return {error:'offline'};
+  try{ return await c.from('sessions').update(Object.assign({updated_at:new Date().toISOString()},fields)).eq('id',id); }catch(e){ return {error:e}; }
+}
+function sessionProgress(){ if(!currentSprint) return {estimated:0,total:0}; const total=currentSprint.stories.length; const estimated=currentSprint.stories.filter(s=>s.points!=null).length; return {estimated,total}; }
+function pushSessionProgress(status){
+  if(!isAdmin || !currentSessionId) return;
+  const p=sessionProgress();
+  dbUpdateSession(currentSessionId, {estimated:p.estimated, total:p.total, sprint:currentSprintId, status:status||'active'});
+}
+
 const BOTS=[];
 const DECK=['0','1','2','3','5','8','13','21','?','☕'];
 const EMOJIS=['🐭','🦍','🐱','🐦','🦜','🕊️','🐺','🦫','🦁','🦊','🐼','🦉','🐙','🐯','🦄'];
@@ -503,7 +590,7 @@ let cfg={
   adminUser:'admin', adminPass:'admin123'
 };
 let isAdmin=false;
-function sessionLink(){ return `${location.origin}${location.pathname}?session=motorhub-sprint11`; }
+function sessionLink(){ return playerLink(currentSessionId); }
 function snLink(id){ return `${cfg.instance}/rm_story.do?sysparm_query=number=${encodeURIComponent(id)}`; }
 
 /* ---------- ServiceNow mock ---------- */
@@ -567,6 +654,7 @@ const SPRINTS={
 /* ---------- State ---------- */
 let me={name:'You', initials:'YOU', emoji:'🐭', color:'#E24B4A'};
 let currentSprint=null, currentStory=null, currentSprintId='s1';
+let currentSessionId=null, currentSessionName='';
 let started=false, revealed=false, myPick=null, submitted=false, facilitatorChoice=null;
 let tieSpeakers=[];
 let selEmoji='🐭', selColor='#E24B4A';
@@ -589,7 +677,7 @@ function applySession(){
   let n=0; Object.values(SPRINTS).forEach(sp=>sp.stories.forEach(s=>{ if(sess.estimates[s.id]!=null){ s.points=sess.estimates[s.id]; n++; } }));
   return n;
 }
-function setTheme(t){ document.documentElement.dataset.theme=t; document.getElementById('theme').value=t; save('pp_theme',t); if(currentStory) requestAnimationFrame(layoutTable); }
+function setTheme(t){ document.documentElement.dataset.theme=t; const sel=document.getElementById('theme'); if(sel) sel.value=t; save('pp_theme',t); if(currentStory) requestAnimationFrame(layoutTable); }
 
 /* ---------- Join ---------- */
 function initJoin(){
@@ -608,23 +696,150 @@ function updatePreview(){
   document.getElementById('join-btn').disabled=!name;
 }
 function initials(name){ const p=name.trim().split(/\s+/); return ((p[0]||'')[0]||'')+((p[1]||'')[0]||''); }
+
+/* ---------- Identity ---------- */
+let _afterIdentity=null;
+function showIdentity(after){
+  _afterIdentity=after||null;
+  document.getElementById('name').value = (me && me.name && me.name!=='You') ? me.name : '';
+  if(me && me.emoji) selEmoji=me.emoji;
+  if(me && me.color) selColor=me.color;
+  initJoin();
+  hideLobby();
+  document.getElementById('join').style.display='flex';
+}
 function joinSession(){
   const name=document.getElementById('name').value.trim(); if(!name) return;
   me={name, initials:initials(name).toUpperCase()||name.slice(0,2).toUpperCase(), emoji:selEmoji, color:selColor};
-  save('pp_profile',me); document.getElementById('join').style.display='none'; startApp();
+  save('pp_profile',me);
+  updateChip();
+  document.getElementById('join').style.display='none';
+  const after=_afterIdentity; _afterIdentity=null;
+  if(after) after();
 }
-function editIdentity(){ document.getElementById('name').value=me.name; selEmoji=me.emoji; selColor=me.color; initJoin(); document.getElementById('join').style.display='flex'; }
+function updateChip(){
+  const av=document.getElementById('chip-av'); if(av){ av.textContent=me.emoji; av.style.background=me.color; }
+  const nm=document.getElementById('chip-name'); if(nm) nm.textContent=me.name;
+}
+function editIdentity(){
+  closeUserMenu();
+  showIdentity(()=>{ updateChip(); updatePresence(); if(currentStory) renderRoom(); toast('Identity updated'); });
+}
 
-function startApp(){
+/* ---------- Lobby ---------- */
+function showLobby(){
+  clearUrlSession();
+  currentSessionId=null; currentSessionName='';
+  document.getElementById('join').style.display='none';
+  document.getElementById('appbar').style.display='none';
+  document.getElementById('layout').style.display='none';
+  const lob=document.getElementById('lobby'); if(lob) lob.style.display='flex';
+  renderLobbyIdentity();
+  const opts=Object.keys(SPRINTS).map(k=>`<option value="${k}">${SPRINTS[k].name} · ${SPRINTS[k].release}</option>`).join('');
+  const sel=document.getElementById('lobby-sprint'); if(sel && !sel.innerHTML) sel.innerHTML=opts;
+  refreshLobbySessions();
+}
+function hideLobby(){ const l=document.getElementById('lobby'); if(l) l.style.display='none'; }
+function renderLobbyIdentity(){
+  const el=document.getElementById('lobby-me'); if(!el) return;
+  el.innerHTML=`<div class="avatar" style="width:30px;height:30px;font-size:17px;border-width:1px;background:${me.color}">${me.emoji}</div>
+    <span style="font-weight:600;">${me.name}</span>
+    <button class="btn-ghost-ai" onclick="showIdentity(showLobby)">edit</button>`;
+}
+async function refreshLobbySessions(){
+  const listEl=document.getElementById('lobby-sessions'); if(!listEl) return;
+  listEl.innerHTML='<div class="muted-note">Loading sessions…</div>';
+  const res=await dbListSessions();
+  if(res.error){ listEl.innerHTML='<div class="muted-note">Shared session history isn’t set up yet — run the setup SQL from the README to enable it. You can still create sessions and join by link.</div>'; return; }
+  const data=res.data||[];
+  if(!data.length){ listEl.innerHTML='<div class="muted-note">No sessions yet — start one above.</div>'; return; }
+  listEl.innerHTML=data.map(s=>{
+    const done=s.status==='completed';
+    const when=s.created_at?new Date(s.created_at).toLocaleDateString(undefined,{month:'short',day:'numeric'})+' '+new Date(s.created_at).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'}):'';
+    const spr=SPRINTS[s.sprint]?SPRINTS[s.sprint].name:(s.sprint||'');
+    return `<div class="sess-row">
+      <div class="sess-main">
+        <div class="sess-name">${escapeHtml(s.name||s.id)} ${done?'<span class="pill pill-done">completed</span>':'<span class="pill pill-blue">active</span>'}</div>
+        <div class="sess-sub">${escapeHtml(spr)} · ${s.estimated||0}/${s.total||0} sized · ${escapeHtml(s.facilitator||'—')} · ${when}</div>
+      </div>
+      <button class="btn ${done?'':'btn-primary'}" onclick="joinExisting('${s.id}','${s.sprint||''}')">${done?'Review':'Join'}</button>
+    </div>`;
+  }).join('');
+}
+function escapeHtml(s){ return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function joinExisting(id, sprintId){ enterSession(id, sprintId||undefined); }
+function createSessionFromLobby(){
+  const sprintSel=document.getElementById('lobby-sprint'); const sprintId=sprintSel?sprintSel.value:'s1';
+  const nameInput=document.getElementById('lobby-sess-name');
+  const name=((nameInput&&nameInput.value)||'').trim() || (SPRINTS[sprintId].name+' planning');
+  const id=newSessionId(name);
+  claimHost(id);
+  currentSessionName=name;
+  dbCreateSession({id, name, sprint:sprintId, facilitator:me.name, estimated:0, total:SPRINTS[sprintId].stories.length, status:'active'});
+  enterSession(id, sprintId);
+  setTimeout(()=>askShare(playerLink(id)), 350);
+}
+
+/* ---------- Enter a session (room) ---------- */
+function enterSession(id, sprintId){
+  currentSessionId=id;
+  setUrlSession(id);
+  isAdmin=isHostOf(id);
+  hideLobby();
+  document.getElementById('join').style.display='none';
   document.getElementById('appbar').style.display='flex';
   document.getElementById('layout').style.display='grid';
-  const av=document.getElementById('chip-av'); av.textContent=me.emoji; av.style.background=me.color;
-  document.getElementById('chip-name').textContent=me.name;
+  updateChip();
   updateRoleChip();
+  if(sprintId){ const sel=document.getElementById('sprint'); if(sel) sel.value=sprintId; }
   loadSprint();
   ensureRealtime();
   updateLiveStatus();
+  updateShareUi();
+  updateSessionTitle();
+  fetchSessionMeta(id);
 }
+async function fetchSessionMeta(id){
+  const c=getClient(); if(!c) return;
+  try{
+    const r=await c.from('sessions').select('name,sprint,status').eq('id',id).maybeSingle();
+    if(r && r.data){ if(r.data.name){ currentSessionName=r.data.name; updateSessionTitle(); } }
+  }catch(e){}
+}
+function updateSessionTitle(){ const el=document.getElementById('session-name'); if(el) el.textContent = currentSessionName || currentSessionId || ''; }
+
+/* ---------- Share link ---------- */
+function updateShareUi(){ const btn=document.getElementById('share-btn'); if(btn) btn.style.display = (currentSessionId && isAdmin) ? 'inline-flex' : 'none'; }
+function askShare(link){ const el=document.getElementById('share-link'); if(!el) return; el.value=link; document.getElementById('share-ov').style.display='flex'; }
+function openShare(){ askShare(playerLink(currentSessionId)); }
+function closeShare(){ document.getElementById('share-ov').style.display='none'; }
+function copyShareFromModal(){ const el=document.getElementById('share-link'); el.select(); try{navigator.clipboard.writeText(el.value);}catch(e){ try{document.execCommand('copy');}catch(_){} } toast('Player link copied — share it with your team'); }
+
+/* ---------- User menu ---------- */
+function toggleUserMenu(){ const m=document.getElementById('user-menu'); if(!m) return; const show=m.style.display!=='block'; if(show) renderUserMenu(); m.style.display=show?'block':'none'; }
+function closeUserMenu(){ const m=document.getElementById('user-menu'); if(m) m.style.display='none'; }
+const THEMES=[['cream','Cream'],['light','Light'],['dark','Dark'],['midnight','Midnight'],['forest','Forest'],['sunset','Sunset']];
+function renderUserMenu(){
+  const m=document.getElementById('user-menu'); if(!m) return;
+  const cur=document.documentElement.dataset.theme||'cream';
+  m.innerHTML=`
+    <div class="um-head"><div class="avatar" style="width:26px;height:26px;font-size:15px;border-width:1px;background:${me.color}">${me.emoji}</div><span>${escapeHtml(me.name)}</span></div>
+    <button class="um-item" onclick="editIdentity()">🎭 Change name & avatar</button>
+    <div class="um-label">Theme</div>
+    <div class="um-themes">${THEMES.map(([v,l])=>`<button class="um-theme ${v===cur?'sel':''}" onclick="menuSetTheme('${v}')">${l}</button>`).join('')}</div>
+    ${currentSessionId?`<div class="um-sep"></div><button class="um-item" onclick="openShare()">🔗 Share player link</button><button class="um-item" onclick="leaveSession()">🚪 Leave to lobby</button>`:''}`;
+}
+function menuSetTheme(t){ setTheme(t); renderUserMenu(); }
+function leaveSession(){
+  closeUserMenu();
+  if(chan){ try{ chan.untrack(); chan.unsubscribe(); }catch(e){} chan=null; }
+  others={}; revealedVotes={}; currentStory=null; started=false; revealed=false; isAdmin=false;
+  showLobby();
+}
+document.addEventListener('click', function(e){
+  const chip=document.getElementById('userchip'), menu=document.getElementById('user-menu');
+  if(menu && menu.style.display==='block' && !menu.contains(e.target) && chip && !chip.contains(e.target)) closeUserMenu();
+});
 
 /* ---------- Participants ---------- */
 function participants(){
@@ -990,6 +1205,7 @@ function writeBack(){
   recordEstimate(currentStory.id, currentStory.points);
   renderStoryList(); updateMeta();
   broadcastState();
+  pushSessionProgress('active');
   toast(`✓ ${currentStory.id} → ${facilitatorChoice} pts written to ServiceNow · work note added`);
   console.log('WRITE-BACK payload →', {story:currentStory.id, story_points:facilitatorChoice, work_notes:workNote});
   endRound();
@@ -1001,6 +1217,7 @@ function writeBack(){
 }
 function showAllDone(){
   allDone=true; currentStory=null; stopTimer();
+  pushSessionProgress('completed');
   const room=document.getElementById('room'); if(room) room.style.display='none';
   const e=document.getElementById('empty'); if(!e) return;
   e.innerHTML='<div style="font-size:40px;">🎉</div><div style="font-weight:600; color:var(--muted); margin-bottom:4px;">All stories estimated</div><div>Every story in this sprint has a confirmed estimate.</div>';
@@ -1013,33 +1230,15 @@ let _confirmFn=null;
 function askConfirm(msg, okLabel, fn){ _confirmFn=fn; document.getElementById('confirm-msg').textContent=msg; document.getElementById('confirm-ok').textContent=okLabel||'Confirm'; document.getElementById('confirm-ov').style.display='flex'; }
 function closeConfirm(ok){ document.getElementById('confirm-ov').style.display='none'; const fn=_confirmFn; _confirmFn=null; if(ok&&fn) fn(); }
 
-/* ---------- Facilitator / admin auth ---------- */
-let _afterLogin=null;
-function roleChipClick(){ if(isAdmin) signOutFacilitator(); else showAdminLogin(null); }
+/* ---------- Facilitator (host model — creator of the session) ---------- */
+function roleChipClick(){ if(isAdmin) openShare(); else toast('The person who created this session is the facilitator'); }
 function updateRoleChip(){
   const chip=document.getElementById('role-chip'), gear=document.getElementById('gear-btn');
   if(!chip) return;
-  if(isAdmin){ chip.className='role-chip fac'; chip.innerHTML='🔒 Facilitator · sign out'; if(gear) gear.style.display='flex'; }
-  else { chip.className='role-chip player'; chip.innerHTML='👤 Player · sign in as facilitator'; if(gear) gear.style.display='none'; }
+  if(isAdmin){ chip.className='role-chip fac'; chip.innerHTML='🔒 Facilitator'; if(gear) gear.style.display='flex'; }
+  else { chip.className='role-chip player'; chip.innerHTML='👤 Player'; if(gear) gear.style.display='none'; }
 }
-function signOutFacilitator(){ isAdmin=false; updateRoleChip(); updatePresence(); if(currentStory) renderRoom(); toast('Signed out — you are a player'); }
-function openAdmin(){ if(!isAdmin){ showAdminLogin(openAdminPanel); return; } openAdminPanel(); }
-function showAdminLogin(after){
-  _afterLogin=after||null;
-  document.getElementById('adm-login-user').value='';
-  document.getElementById('adm-login-pass').value='';
-  document.getElementById('adm-login-err').textContent='';
-  document.getElementById('adminlogin-ov').style.display='flex';
-}
-function closeAdminLogin(){ document.getElementById('adminlogin-ov').style.display='none'; }
-function loginAdmin(){
-  const u=document.getElementById('adm-login-user').value, p=document.getElementById('adm-login-pass').value;
-  if(u===cfg.adminUser && p===cfg.adminPass){
-    isAdmin=true; closeAdminLogin(); updateRoleChip(); updatePresence(); if(currentStory) renderRoom();
-    const fn=_afterLogin; _afterLogin=null; if(fn) fn();
-    toast('Signed in as facilitator');
-  } else { document.getElementById('adm-login-err').textContent='Incorrect username or password.'; }
-}
+function openAdmin(){ if(!isAdmin) return; openAdminPanel(); }
 function copyLink(){
   const el=document.getElementById('adm-link'); el.select();
   try{ navigator.clipboard.writeText(el.value); }catch(e){ try{document.execCommand('copy');}catch(_){} }
@@ -1049,8 +1248,6 @@ function copyLink(){
 /* ---------- Admin settings ---------- */
 function openAdminPanel(){
   document.getElementById('adm-link').value=sessionLink();
-  document.getElementById('adm-admuser').value=cfg.adminUser;
-  document.getElementById('adm-admpass').value=cfg.adminPass;
   document.getElementById('adm-instance').value=cfg.instance;
   document.getElementById('adm-get').value=cfg.getEndpoint;
   document.getElementById('adm-patch').value=cfg.patchEndpoint;
@@ -1081,9 +1278,7 @@ function saveAdmin(){
     patchEndpoint:document.getElementById('adm-patch').value||'/api/now/table/rm_story/{sys_id}',
     auth:document.getElementById('adm-auth').value,
     basicUser:document.getElementById('adm-user').value, basicPass:document.getElementById('adm-pass').value,
-    tokenUrl:document.getElementById('adm-token').value, clientId:document.getElementById('adm-cid').value, clientSecret:document.getElementById('adm-secret').value,
-    adminUser:document.getElementById('adm-admuser').value||'admin',
-    adminPass:document.getElementById('adm-admpass').value||cfg.adminPass
+    tokenUrl:document.getElementById('adm-token').value, clientId:document.getElementById('adm-cid').value, clientSecret:document.getElementById('adm-secret').value
   };
   save('pp_admin',cfg); closeAdmin(); if(currentStory) renderRoom();
   toast('ServiceNow settings saved');
@@ -1095,11 +1290,20 @@ function toast(msg){ const el=document.getElementById('toast'); el.textContent=m
 /* ---------- Boot ---------- */
 (function boot(){
   const savedCfg=load('pp_admin'); if(savedCfg) cfg=Object.assign(cfg,savedCfg);
-  const restored=applySession(); if(restored) setTimeout(()=>toast(`Resumed session — ${restored} stories already estimated`), 400);
+  applySession();
   const savedTheme=load('pp_theme'); if(savedTheme) setTheme(savedTheme); else setTheme('cream');
-  const prof=load('pp_profile');
-  if(prof && prof.name){ me=prof; selEmoji=prof.emoji; selColor=prof.color; document.getElementById('join').style.display='none'; startApp(); }
-  else { initJoin(); }
+  const prof=load('pp_profile'); if(prof && prof.name){ me=prof; selEmoji=prof.emoji; selColor=prof.color; }
+  initJoin();
+  const sid=urlSession();
+  if(sid){
+    /* Opened a shared link → set identity if needed, then enter that session. */
+    if(prof && prof.name){ enterSession(sid); }
+    else { showIdentity(()=>enterSession(sid)); }
+  } else {
+    /* No session in the URL → lobby (create or pick a session). */
+    if(prof && prof.name){ showLobby(); }
+    else { showIdentity(showLobby); }
+  }
 })();
 </script>
 </body>
