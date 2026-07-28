@@ -110,7 +110,7 @@ alter table public.sessions enable row level security;
 -- Prototype-grade: allow the browser (anon/publishable key) to read & write.
 -- Tighten this before production.
 grant usage on schema public to anon;
-grant select, insert, update on public.sessions to anon;
+grant select, insert, update, delete on public.sessions to anon;
 
 drop policy if exists "sessions public access" on public.sessions;
 create policy "sessions public access" on public.sessions

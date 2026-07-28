@@ -311,7 +311,9 @@
   .sess-row{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 14px; border:1px solid var(--line); border-radius:10px; margin-bottom:8px; background:var(--bg);}
   .sess-name{font-weight:600; font-size:13px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
   .sess-sub{font-size:11px; color:var(--muted); margin-top:3px;}
-  .sess-actions{display:flex; gap:8px; flex:none;}
+  .sess-actions{display:flex; gap:8px; flex:none; align-items:center;}
+  .btn-icon-danger{background:none; border:1px solid var(--line); border-radius:8px; padding:6px 9px; cursor:pointer; font-size:13px; line-height:1;}
+  .btn-icon-danger:hover{background:var(--warn-soft,#fbeae6); border-color:var(--warn,#c0392b);}
   @media(max-width:560px){ .lobby-create-row{flex-direction:column;} .lobby-create-row input,.lobby-create-row select,.lobby-create-row button{width:100%;} }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -678,6 +680,14 @@ async function dbUpdateSession(id, fields){
   const c=getClient(); if(!c) return {error:'offline'};
   try{ return await c.from('sessions').update(Object.assign({updated_at:new Date().toISOString()},fields)).eq('id',id); }catch(e){ return {error:e}; }
 }
+async function dbDeleteSession(id){
+  const c=getClient(); if(!c) return {error:'offline'};
+  try{ return await c.from('sessions').delete().eq('id',id).select(); }catch(e){ return {error:e}; }
+}
+async function dbDeleteSessionsIn(ids){
+  const c=getClient(); if(!c || !ids.length) return {data:[],error:'offline'};
+  try{ return await c.from('sessions').delete().in('id',ids).select(); }catch(e){ return {error:e}; }
+}
 function sessionProgress(){ if(!currentSprint) return {estimated:0,total:0}; const total=currentSprint.stories.length; const estimated=currentSprint.stories.filter(s=>s.points!=null).length; return {estimated,total}; }
 function touchSession(){ if(!demoMode && isAdmin && currentSessionId) dbUpdateSession(currentSessionId, {}); }
 function pushSessionProgress(status){
@@ -884,10 +894,11 @@ function sessRowHtml(s, kind){
     : sessionExpired(s) ? '<span class="pill pill-meta">expired</span>'
     : '<span class="pill pill-blue">active</span>';
   const meta=[spr, (s.estimated||0)+'/'+(s.total||0)+' sized', escapeHtml(s.facilitator||'—'), fmtWhen(s.created_at)].filter(Boolean).join(' · ');
+  const del = isSuper() ? `<button class="btn btn-icon-danger" onclick="deleteSessionFromLobby('${s.id}')" title="Delete permanently">🗑</button>` : '';
   const right = kind==='active'
-    ? `${isSuper()?`<button class="btn btn-danger-ghost" onclick="closeSessionFromLobby('${s.id}')" title="Close (admin)">Close</button>`:''}
-       <button class="btn btn-primary" onclick="joinExisting('${s.id}','${s.sprint||''}')">Join</button>`
-    : `<button class="btn" onclick="joinExisting('${s.id}','${s.sprint||''}')">Review</button>`;
+    ? `${isSuper()?`<button class="btn btn-danger-ghost" onclick="closeSessionFromLobby('${s.id}')" title="Close (move to History)">Close</button>`:''}
+       <button class="btn btn-primary" onclick="joinExisting('${s.id}','${s.sprint||''}')">Join</button>${del}`
+    : `<button class="btn" onclick="joinExisting('${s.id}','${s.sprint||''}')">Review</button>${del}`;
   return `<div class="sess-row">
     <div class="sess-main">
       <div class="sess-name">${escapeHtml(s.name||s.id)} ${badge}</div>
@@ -903,15 +914,38 @@ async function refreshLobbySessions(){
   if(res.error){ listEl.innerHTML='<div class="muted-note">Shared session history isn’t set up yet — run the setup SQL from the README to enable it. You can still create sessions and join by link.</div>'; return; }
   const data=res.data||[];
   if(!data.length){ listEl.innerHTML='<div class="muted-note">No sessions yet — start one above.</div>'; return; }
+  _lastSessions=data;
   const active=data.filter(s=>!sessionEnded(s) && !sessionExpired(s));
   const history=data.filter(s=>sessionEnded(s) || sessionExpired(s));
   let html='';
   html+= active.length ? active.map(s=>sessRowHtml(s,'active')).join('') : '<div class="muted-note">No active sessions — start one above.</div>';
   if(history.length){
-    html+=`<div class="lobby-list-hd" style="margin-top:16px;"><h3 style="margin:0;">History <span style="color:var(--muted); font-weight:400;">· expired &amp; closed</span></h3></div>`;
+    html+=`<div class="lobby-list-hd" style="margin-top:16px;"><h3 style="margin:0;">History <span style="color:var(--muted); font-weight:400;">· expired &amp; closed</span></h3>
+      ${isSuper()?`<button class="btn-ghost-ai" onclick="clearHistorySessions()">🗑 Clear history</button>`:''}</div>`;
     html+=history.map(s=>sessRowHtml(s,'history')).join('');
   }
   listEl.innerHTML=html;
+}
+let _lastSessions=[];
+function deleteSessionFromLobby(id){
+  if(!isSuper()){ toast('Enter the team passkey to manage sessions'); return; }
+  askConfirm('Permanently delete this session? This can’t be undone.', 'Delete', async ()=>{
+    const r=await dbDeleteSession(id);
+    if(r.error){ toast('Delete failed — '+(r.error.message||r.error)); return; }
+    if(Array.isArray(r.data) && r.data.length===0){ toast('Nothing deleted — the DB blocks deletes. Add: grant delete on public.sessions to anon;'); return; }
+    refreshLobbySessions(); toast('Session deleted');
+  });
+}
+function clearHistorySessions(){
+  if(!isSuper()) return;
+  const ids=(_lastSessions||[]).filter(s=>sessionEnded(s)||sessionExpired(s)).map(s=>s.id);
+  if(!ids.length){ toast('No history to clear'); return; }
+  askConfirm('Permanently delete all '+ids.length+' history session(s)? This can’t be undone.', 'Delete all', async ()=>{
+    const r=await dbDeleteSessionsIn(ids);
+    if(r.error){ toast('Delete failed — '+(r.error.message||r.error)); return; }
+    if(Array.isArray(r.data) && r.data.length===0){ toast('Nothing deleted — the DB blocks deletes. Add: grant delete on public.sessions to anon;'); return; }
+    refreshLobbySessions(); toast('History cleared');
+  });
 }
 function escapeHtml(s){ return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function joinExisting(id, sprintId){ enterSession(id, sprintId||undefined); }
