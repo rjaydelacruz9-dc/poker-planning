@@ -244,6 +244,32 @@
   .um-swatch{width:14px; height:14px; border-radius:4px; border:1px solid rgba(0,0,0,.15); flex:none;}
   .um-sep{height:1px; background:var(--line); margin:6px 4px;}
 
+  /* Demo banner */
+  #demo-banner{position:sticky; top:0; z-index:80; display:flex; align-items:center; gap:10px; justify-content:center;
+    background:repeating-linear-gradient(45deg,#7b3fb0,#7b3fb0 14px,#8e4dc4 14px,#8e4dc4 28px); color:#fff;
+    padding:9px 16px; font-size:14px; letter-spacing:.02em; box-shadow:0 2px 8px rgba(0,0,0,.25);}
+  #demo-banner strong{font-weight:800; letter-spacing:.08em;}
+  #demo-banner .demo-sub{opacity:.9; font-size:12.5px;}
+  #demo-banner .demo-pulse{font-size:16px; animation:demopulse 1.4s ease-in-out infinite;}
+  @keyframes demopulse{0%,100%{transform:scale(1)} 50%{transform:scale(1.25)}}
+  #demo-banner .demo-exit{margin-left:8px; background:rgba(255,255,255,.2); color:#fff; border:1px solid rgba(255,255,255,.5); border-radius:7px; padding:4px 12px; font-size:12px; font-weight:600; cursor:pointer;}
+  #demo-banner .demo-exit:hover{background:rgba(255,255,255,.32);}
+  body.demo .appbar{box-shadow:inset 0 0 0 2px #8e4dc4;}
+  @media(max-width:560px){ #demo-banner .demo-sub{display:none;} }
+
+  /* Empty-room call-to-action */
+  .side-label{font-weight:700; font-size:14px; color:var(--ink);}
+  .cta-wrap{display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; padding:40px 20px; text-align:center;}
+  .cta-cards{display:flex; gap:16px; flex-wrap:wrap; justify-content:center;}
+  .cta-card{width:250px; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:22px 20px; text-align:center; box-shadow:0 4px 14px rgba(0,0,0,.06);}
+  .cta-card .cta-ico{font-size:32px;}
+  .cta-card h4{margin:10px 0 6px; font-size:15px;}
+  .cta-card p{margin:0 0 16px; font-size:12.5px; color:var(--muted); line-height:1.5;}
+  .test-result{font-size:12.5px; margin-top:10px; padding:8px 10px; border-radius:8px; display:none;}
+  .test-result.ok{display:block; background:var(--accent-soft,#e6f4ee); color:var(--good,#1D9E75); border:1px solid var(--good,#1D9E75);}
+  .test-result.err{display:block; background:var(--warn-soft,#fbeae6); color:var(--warn,#c0392b); border:1px solid var(--warn,#c0392b);}
+  .test-result.busy{display:block; background:var(--bg); color:var(--muted); border:1px solid var(--line);}
+
   /* Lobby */
   .lobby-card{background:var(--card); border-radius:18px; box-shadow:0 20px 60px rgba(0,0,0,.25); width:min(680px,92vw); max-height:90vh; overflow:auto; padding:26px 28px;}
   .lobby-top{display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:20px;}
@@ -267,6 +293,13 @@
 <body>
 <h1 class="sr-only">Sprint planning poker for ServiceNow agile management</h1>
 
+<div id="demo-banner" style="display:none;">
+  <span class="demo-pulse">🎮</span>
+  <strong>DEMO MODE</strong>
+  <span class="demo-sub">— sample data &amp; bots · nothing is saved or shared</span>
+  <button class="demo-exit" onclick="leaveSession()">Exit demo</button>
+</div>
+
 <div class="overlay" id="lobby" style="display:none;">
   <div class="lobby-card">
     <div class="lobby-top">
@@ -277,10 +310,9 @@
       <h3>Start a new session</h3>
       <div class="lobby-create-row">
         <input type="text" id="lobby-sess-name" placeholder="Session name (e.g. Sprint 11 planning)" maxlength="60" />
-        <select id="lobby-sprint"></select>
         <button class="btn btn-primary" onclick="createSessionFromLobby()">Create &amp; host</button>
       </div>
-      <p class="muted-note">You’ll be the <strong>facilitator</strong>. Share the join link with your team — they join as players, no login needed.</p>
+      <p class="muted-note">You’ll be the <strong>facilitator</strong>. You start with an empty board — connect ServiceNow to pull stories, then invite your team with the join link.</p>
     </div>
     <div class="lobby-demo">
       <div>
@@ -337,12 +369,8 @@
 
 <div class="layout" id="layout" style="display:none;">
   <aside>
-    <label class="fld" for="sprint">Sprint</label>
-    <select id="sprint">
-      <option value="s1">Motor Sprint 11 · 30 Jul Release</option>
-      <option value="s2">Motor Sprint 12 · 13 Aug Release</option>
-    </select>
-    <div style="margin-top:12px;"><button class="btn btn-primary" style="width:100%" onclick="loadSprint()">Pull stories from sprint</button></div>
+    <label class="fld">Backlog</label>
+    <div id="backlog-head"></div>
     <div id="sprint-meta" style="margin-top:14px; font-size:12px; color:var(--muted); display:none;"></div>
     <div class="storylist" id="storylist"></div>
   </aside>
@@ -415,10 +443,17 @@
       <p style="font-size:11px; color:var(--muted); margin:8px 0 0;">Players join through this link with just a name and avatar — no login required. You’re the facilitator because you created this session.</p>
     </div>
 
-    <div class="row" style="margin-top:6px;">
-      <button class="btn" onclick="closeAdmin()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveAdmin()">Save settings</button>
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
+      <button class="btn" onclick="snTestAuth()">🔌 Test connection</button>
+      <span style="font-size:11px; color:var(--muted);">Verifies the endpoint + auth before pulling.</span>
     </div>
+    <div class="test-result" id="adm-test"></div>
+
+    <div class="row" style="margin-top:14px; justify-content:space-between;">
+      <button class="btn" onclick="closeAdmin()">Cancel</button>
+      <button class="btn btn-primary" id="adm-pull-btn" onclick="saveAndPull()">⤓ Save &amp; pull stories</button>
+    </div>
+    <p style="font-size:10.5px; color:var(--muted); margin:10px 0 0;">⚠️ Prototype: calls run from the browser, so a ServiceNow instance without CORS/a proxy will block them. Credentials are stored in this browser only — never use production secrets here.</p>
   </div>
 </div>
 
@@ -506,17 +541,19 @@ function broadcastState(){
     by:myId, sprintId:currentSprintId, storyId:currentStory?currentStory.id:null,
     started, revealed, endsAt:roundEndsAt, roundId, done:allDone,
     estimates:gatherEstimates(), votes:revealed?revealedVotes:null,
-    choice:revealed?facilitatorChoice:null, worknotes:revealed?worknotesText:''
+    choice:revealed?facilitatorChoice:null, worknotes:revealed?worknotesText:'',
+    backlog:(currentSprintId==='sn' && PULLED)?PULLED:null
   }});
 }
 function applyState(s){
   if(!s || s.by===myId) return;
-  if(s.estimates) Object.entries(s.estimates).forEach(([id,pts])=>setStoryPoints(id,pts));
+  if(s.backlog){ PULLED=s.backlog; }
   if(s.sprintId && s.sprintId!==currentSprintId){
-    currentSprintId=s.sprintId; currentSprint=SPRINTS[s.sprintId];
-    const sel=document.getElementById('sprint'); if(sel) sel.value=s.sprintId; updateMeta();
+    currentSprintId=s.sprintId; currentSprint=sprintById(s.sprintId);
+    renderBacklogHead(); updateMeta();
   }
-  renderStoryList();
+  if(s.estimates) Object.entries(s.estimates).forEach(([id,pts])=>setStoryPoints(id,pts));
+  renderStoryList(); renderEmptyState();
   if(s.done && !s.storyId){ showAllDone(); return; }
   /* Only FORCE everyone onto the facilitator's story while a round is in progress.
      When idle (not started), players are free to browse the backlog on their own. */
@@ -760,15 +797,18 @@ function editIdentity(){
 /* ---------- Lobby ---------- */
 function showLobby(){
   clearUrlSession();
+  demoMode=false; updateDemoBanner();
   currentSessionId=null; currentSessionName='';
   document.getElementById('join').style.display='none';
   document.getElementById('appbar').style.display='none';
   document.getElementById('layout').style.display='none';
   const lob=document.getElementById('lobby'); if(lob) lob.style.display='flex';
   renderLobbyIdentity();
-  const opts=Object.keys(SPRINTS).map(k=>`<option value="${k}">${SPRINTS[k].name} · ${SPRINTS[k].release}</option>`).join('');
-  const sel=document.getElementById('lobby-sprint'); if(sel && !sel.innerHTML) sel.innerHTML=opts;
   refreshLobbySessions();
+}
+function updateDemoBanner(){
+  const b=document.getElementById('demo-banner'); if(b) b.style.display=demoMode?'flex':'none';
+  document.body.classList.toggle('demo', !!demoMode);
 }
 function hideLobby(){ const l=document.getElementById('lobby'); if(l) l.style.display='none'; }
 function renderLobbyIdentity(){
@@ -800,20 +840,19 @@ async function refreshLobbySessions(){
 function escapeHtml(s){ return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function joinExisting(id, sprintId){ enterSession(id, sprintId||undefined); }
 function createSessionFromLobby(){
-  const sprintSel=document.getElementById('lobby-sprint'); const sprintId=sprintSel?sprintSel.value:'s1';
   const nameInput=document.getElementById('lobby-sess-name');
-  const name=((nameInput&&nameInput.value)||'').trim() || (SPRINTS[sprintId].name+' planning');
+  const name=((nameInput&&nameInput.value)||'').trim() || 'Planning session';
   const id=newSessionId(name);
   claimHost(id);
   currentSessionName=name;
-  dbCreateSession({id, name, sprint:sprintId, facilitator:me.name, estimated:0, total:SPRINTS[sprintId].stories.length, status:'active'});
-  enterSession(id, sprintId);
+  dbCreateSession({id, name, sprint:'', facilitator:me.name, estimated:0, total:0, status:'active'});
+  enterSession(id, null);
   setTimeout(()=>askShare(playerLink(id)), 350);
 }
 
 /* ---------- Enter a session (room) ---------- */
 function enterSession(id, sprintId){
-  demoMode=false; botIn=[];
+  demoMode=false; botIn=[]; updateDemoBanner();
   currentSessionId=id;
   setUrlSession(id);
   isAdmin=isHostOf(id);
@@ -823,7 +862,8 @@ function enterSession(id, sprintId){
   document.getElementById('layout').style.display='grid';
   updateChip();
   updateRoleChip();
-  if(sprintId){ const sel=document.getElementById('sprint'); if(sel) sel.value=sprintId; }
+  currentSprintId = sprintId || null;
+  currentStory=null;
   loadSprint();
   ensureRealtime();
   updateLiveStatus();
@@ -852,8 +892,8 @@ function startDemo(){
   document.getElementById('join').style.display='none';
   document.getElementById('appbar').style.display='flex';
   document.getElementById('layout').style.display='grid';
-  updateChip(); updateRoleChip();
-  const sel=document.getElementById('sprint'); if(sel) sel.value='s1';
+  updateChip(); updateRoleChip(); updateDemoBanner();
+  currentSprintId='s1';
   loadSprint();
   updateLiveStatus(); updateShareUi(); updateSessionTitle();
   toast('🎮 Demo — you’re the facilitator. Open a story and press Start; the demo bots will vote along.');
@@ -897,6 +937,7 @@ function leaveSession(){
   if(chan){ try{ chan.untrack(); chan.unsubscribe(); }catch(e){} chan=null; }
   endRound();
   demoMode=false; botIn=[]; others={}; revealedVotes={}; currentStory=null; started=false; revealed=false; isAdmin=false; worknotesText=''; allDone=false;
+  updateDemoBanner();
   showLobby();
 }
 document.addEventListener('click', function(e){
@@ -925,14 +966,72 @@ function participants(){
 function shuffle(arr){const a=arr.slice(); for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]];} return a;}
 function allVoted(){ const ps=participants(); return ps.length>0 && ps.every(p=>p.voted); }
 
-/* ---------- Lobby ---------- */
-function loadSprint(){ currentSprintId=document.getElementById('sprint').value; currentSprint=SPRINTS[currentSprintId]; updateMeta(); renderStoryList(); if(isAdmin) broadcastState(); }
+/* ---------- Backlog / sprint ---------- */
+let PULLED=null; /* dynamic sprint pulled from ServiceNow */
+function sprintById(id){ return id==='sn' ? PULLED : (id ? (SPRINTS[id]||null) : null); }
+function hasBacklog(){ return !!(currentSprint && currentSprint.stories && currentSprint.stories.length); }
+function loadSprint(){
+  currentSprint = sprintById(currentSprintId);
+  renderBacklogHead(); updateMeta(); renderStoryList(); renderEmptyState();
+  if(isAdmin && !demoMode) broadcastState();
+}
+function renderBacklogHead(){
+  const el=document.getElementById('backlog-head'); if(!el) return;
+  if(demoMode){ el.innerHTML=`<div class="side-label">🎮 Demo backlog</div><div class="muted-note" style="margin:2px 0 0;">Motor Sprint 11 · sample stories</div>`; return; }
+  if(hasBacklog()){
+    el.innerHTML=`<div class="side-label">${escapeHtml(currentSprint.name||'Backlog')}</div>`+
+      (isAdmin?`<button class="btn" style="width:100%; margin-top:8px;" onclick="openAdmin()">↻ Re-pull from ServiceNow</button>`:'');
+  } else {
+    el.innerHTML = isAdmin
+      ? `<button class="btn btn-primary" style="width:100%;" onclick="openAdmin()">⚙ Connect ServiceNow</button>`
+      : `<div class="muted-note" style="margin:0;">Waiting for the facilitator to load the backlog…</div>`;
+  }
+}
+function renderEmptyState(){
+  const e=document.getElementById('empty'); if(!e) return;
+  if(currentStory){ return; }
+  const room=document.getElementById('room'); if(room) room.style.display='none';
+  e.style.display='flex';
+  if(hasBacklog()){
+    e.innerHTML=`<div style="font-size:40px;">🂠</div>
+      <div style="font-weight:600; color:var(--muted); margin-bottom:4px;">Pick a story to estimate</div>
+      <div>Choose a story from the backlog on the left to open the table.</div>`;
+    return;
+  }
+  if(demoMode){ return; }
+  /* Real session, no backlog yet → the two setup CTAs */
+  if(isAdmin){
+    e.innerHTML=`<div class="cta-wrap">
+        <div style="font-size:40px;">🚀</div>
+        <div style="font-weight:600; font-size:16px;">Your session is ready</div>
+        <div style="color:var(--muted); font-size:13px; max-width:420px;">Two quick steps to get your team estimating real ServiceNow stories.</div>
+        <div class="cta-cards">
+          <div class="cta-card">
+            <div class="cta-ico">⚙️</div>
+            <h4>Connect ServiceNow</h4>
+            <p>Point the app at your instance, test the connection, and pull the sprint backlog.</p>
+            <button class="btn btn-primary" onclick="openAdmin()">Set up endpoints</button>
+          </div>
+          <div class="cta-card">
+            <div class="cta-ico">👥</div>
+            <h4>Invite your team</h4>
+            <p>Share the join link so everyone lands in this session as players.</p>
+            <button class="btn" onclick="openShare()">Invite users</button>
+          </div>
+        </div>
+      </div>`;
+  } else {
+    e.innerHTML=`<div class="cta-wrap"><div style="font-size:40px;">⏳</div>
+      <div style="font-weight:600;">Waiting for the facilitator</div>
+      <div style="color:var(--muted); font-size:13px;">They’re setting up the backlog. The table will appear here once a story is opened.</div></div>`;
+  }
+}
 function updateMeta(){
-  if(!currentSprint) return;
-  const meta=document.getElementById('sprint-meta');
+  const meta=document.getElementById('sprint-meta'); if(!meta) return;
+  if(!currentSprint){ meta.style.display='none'; return; }
   const est=currentSprint.stories.filter(s=>s.points!=null).length;
   meta.style.display='block';
-  meta.innerHTML=`<div style="margin-bottom:6px;"><strong>Product:</strong> ${currentSprint.product}<br><strong>Epic:</strong> ${currentSprint.epic}<br><strong>Release:</strong> ${currentSprint.release}</div>`+
+  meta.innerHTML=`<div style="margin-bottom:6px;"><strong>Product:</strong> ${escapeHtml(currentSprint.product||'')}<br><strong>Epic:</strong> ${escapeHtml(currentSprint.epic||'')}<br><strong>Release:</strong> ${escapeHtml(currentSprint.release||'')}</div>`+
     `<strong>${currentSprint.stories.length}</strong> stories · <strong>${est}</strong> estimated · <strong>${currentSprint.stories.length-est}</strong> pending`;
 }
 function storyItemHtml(s,idx){
@@ -1360,7 +1459,7 @@ function updateAdmPreview(){
   const g=document.getElementById('adm-get').value, p=document.getElementById('adm-patch').value;
   document.getElementById('adm-preview').innerHTML=`GET&nbsp;&nbsp; ${inst}${g}?sysparm_query=sprint=&lt;sprint_sys_id&gt;<br>PATCH ${inst}${p}`;
 }
-function saveAdmin(){
+function readAdminForm(){
   cfg={
     instance:(document.getElementById('adm-instance').value||SN_INSTANCE).replace(/\/$/,''),
     getEndpoint:document.getElementById('adm-get').value||'/api/now/table/rm_story',
@@ -1369,8 +1468,74 @@ function saveAdmin(){
     basicUser:document.getElementById('adm-user').value, basicPass:document.getElementById('adm-pass').value,
     tokenUrl:document.getElementById('adm-token').value, clientId:document.getElementById('adm-cid').value, clientSecret:document.getElementById('adm-secret').value
   };
-  save('pp_admin',cfg); closeAdmin(); if(currentStory) renderRoom();
-  toast('ServiceNow settings saved');
+  save('pp_admin',cfg);
+}
+function setTestResult(cls,msg){ const el=document.getElementById('adm-test'); if(!el) return; el.className='test-result '+cls; el.innerHTML=msg; }
+
+/* Acquire an Authorization header for the configured auth method. Throws on failure. */
+async function snAuthHeader(){
+  if(cfg.auth==='oauth'){
+    const url=cfg.instance+(cfg.tokenUrl||'/oauth_token.do');
+    const body=new URLSearchParams({grant_type:'client_credentials', client_id:cfg.clientId, client_secret:cfg.clientSecret});
+    const r=await fetch(url,{method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded','Accept':'application/json'}, body});
+    if(!r.ok) throw new Error('Token request failed ('+r.status+')');
+    const j=await r.json(); if(!j.access_token) throw new Error('No access_token in token response');
+    return 'Bearer '+j.access_token;
+  }
+  if(!cfg.basicUser) throw new Error('Enter a username & password');
+  return 'Basic '+btoa(cfg.basicUser+':'+cfg.basicPass);
+}
+async function snTestAuth(){
+  readAdminForm();
+  if(!/^https?:\/\//.test(cfg.instance)){ setTestResult('err','Enter a valid instance URL (https://…).'); return false; }
+  setTestResult('busy','⏳ Testing connection…');
+  try{
+    const auth=await snAuthHeader();
+    const url=cfg.instance+cfg.getEndpoint+'?sysparm_limit=1&sysparm_fields=number';
+    const r=await fetch(url,{headers:{'Authorization':auth,'Accept':'application/json'}});
+    if(!r.ok) throw new Error('GET failed ('+r.status+(r.status===401?' — check credentials':'')+')');
+    await r.json();
+    setTestResult('ok','✓ Connected — authentication succeeded and the stories endpoint responded.');
+    return true;
+  }catch(e){
+    const cors=(e&&e.message&&/Failed to fetch/i.test(e.message));
+    setTestResult('err','✗ '+(cors?'Could not reach the instance from the browser. This is usually CORS — ServiceNow must allow this origin, or route calls through a server-side proxy (see README).':escapeHtml(e.message)));
+    return false;
+  }
+}
+/* Map a ServiceNow rm_story record to the app's story shape. */
+function mapSnStory(r){
+  const pts=(r.story_points!=null && r.story_points!=='')?(parseInt(r.story_points)||r.story_points):null;
+  return {
+    id:r.number||r.sys_id, sys_id:r.sys_id, t:r.short_description||'(no title)',
+    state:r.state||'', priority:r.priority||'', points:pts,
+    short:r.short_description||'', details:r.description||'', criteria:r.acceptance_criteria||'',
+    ai:'', tags:[], votes:[]
+  };
+}
+async function saveAndPull(){
+  readAdminForm();
+  const btn=document.getElementById('adm-pull-btn'); if(btn){ btn.disabled=true; btn.textContent='Pulling…'; }
+  setTestResult('busy','⏳ Pulling stories from ServiceNow…');
+  try{
+    const auth=await snAuthHeader();
+    const url=cfg.instance+cfg.getEndpoint+'?sysparm_limit=200&sysparm_display_value=true&sysparm_exclude_reference_link=true';
+    const r=await fetch(url,{headers:{'Authorization':auth,'Accept':'application/json'}});
+    if(!r.ok) throw new Error('GET failed ('+r.status+')');
+    const j=await r.json();
+    const rows=(j&&j.result)||[];
+    if(!rows.length){ setTestResult('err','Connected, but the endpoint returned 0 stories. Check the query/table.'); if(btn){btn.disabled=false; btn.textContent='⤓ Save & pull stories';} return; }
+    PULLED={ name:'ServiceNow backlog', release:'', product:cfg.instance.replace(/^https?:\/\//,''), epic:'', stories:rows.map(mapSnStory) };
+    currentSprintId='sn'; currentStory=null;
+    setTestResult('ok','✓ Pulled '+rows.length+' stories.');
+    loadSprint();
+    if(isAdmin) broadcastState();
+    setTimeout(()=>{ closeAdmin(); toast('Pulled '+rows.length+' stories from ServiceNow'); }, 700);
+  }catch(e){
+    const cors=(e&&e.message&&/Failed to fetch/i.test(e.message));
+    setTestResult('err','✗ '+(cors?'Could not reach the instance from the browser (CORS). Route calls through a server-side proxy — see the README.':escapeHtml(e.message)));
+  }
+  if(btn){ btn.disabled=false; btn.textContent='⤓ Save & pull stories'; }
 }
 
 let toastTimer;
