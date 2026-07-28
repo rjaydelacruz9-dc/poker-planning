@@ -1,6 +1,5 @@
 {
-  "cleanUrls": true,
   "rewrites": [
-    { "source": "/", "destination": "/planning-poker.html" }
+    { "source": "/(.*)", "destination": "/planning-poker.html" }
   ]
 }
