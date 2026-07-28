@@ -259,6 +259,28 @@
 
   /* Empty-room call-to-action */
   .side-label{font-weight:700; font-size:14px; color:var(--ink);}
+
+  /* Two-column room: table on the left, your card + results on the right */
+  .room-grid{display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:20px; align-items:start;}
+  .room-right{position:sticky; top:16px; display:flex; flex-direction:column; gap:14px;}
+  .your-card-panel{background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:14px;}
+  .results-panel .results{margin:0;}
+  @media(max-width:900px){ .room-grid{grid-template-columns:1fr;} .room-right{position:static;} }
+
+  /* Reveal: avatars grouped into piles by score */
+  .reveal-summary{text-align:center; font-weight:700; font-size:15px; padding:10px 14px; border-radius:10px; margin-bottom:14px; background:var(--bg); border:1px solid var(--line);}
+  .reveal-summary.ok{background:var(--accent-soft,#e6f4ee); color:var(--accent-dark,#146c4e); border-color:var(--good,#1D9E75);}
+  .reveal-summary.tie{background:var(--warn-soft,#fbeae6); color:var(--warn,#c0392b); border-color:var(--warn,#c0392b);}
+  .reveal-groups{display:flex; gap:12px; flex-wrap:wrap; align-items:flex-start; padding:4px 0 8px;}
+  .rg{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px 12px 10px; min-width:112px; display:flex; flex-direction:column; align-items:center; gap:10px;}
+  .rg-val{font-size:22px; font-weight:800; width:44px; height:44px; border-radius:11px; display:flex; align-items:center; justify-content:center; background:var(--bg); border:1px solid var(--line);}
+  .rg.consensus{border-color:var(--good,#1D9E75); box-shadow:0 0 0 1px var(--good,#1D9E75);}
+  .rg.consensus .rg-val{background:var(--good,#1D9E75); color:#fff; border-color:var(--good,#1D9E75);}
+  .rg.tie .rg-val{background:var(--warn-soft,#fbeae6); color:var(--warn,#c0392b); border-color:var(--warn,#c0392b);}
+  .rg.novote{opacity:.7;}
+  .rg-people{display:flex; flex-direction:column; gap:7px; width:100%;}
+  .rg-person{display:flex; align-items:center; gap:8px; font-size:12px; color:var(--ink);}
+  .rg-count{font-size:11px; color:var(--muted);}
   .cta-wrap{display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; padding:40px 20px; text-align:center;}
   .cta-cards{display:flex; gap:16px; flex-wrap:wrap; justify-content:center;}
   .cta-card{width:250px; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:22px 20px; text-align:center; box-shadow:0 4px 14px rgba(0,0,0,.06);}
@@ -286,6 +308,7 @@
   .sess-row{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 14px; border:1px solid var(--line); border-radius:10px; margin-bottom:8px; background:var(--bg);}
   .sess-name{font-weight:600; font-size:13px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
   .sess-sub{font-size:11px; color:var(--muted); margin-top:3px;}
+  .sess-actions{display:flex; gap:8px; flex:none;}
   @media(max-width:560px){ .lobby-create-row{flex-direction:column;} .lobby-create-row input,.lobby-create-row select,.lobby-create-row button{width:100%;} }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -310,9 +333,11 @@
       <h3>Start a new session</h3>
       <div class="lobby-create-row">
         <input type="text" id="lobby-sess-name" placeholder="Session name (e.g. Sprint 11 planning)" maxlength="60" />
+        <input type="password" id="lobby-passkey" placeholder="Team passkey" oninput="onPasskeyInput()" style="flex:1; min-width:130px;" />
         <button class="btn btn-primary" onclick="createSessionFromLobby()">Create &amp; host</button>
       </div>
-      <p class="muted-note">You’ll be the <strong>facilitator</strong>. You start with an empty board — connect ServiceNow to pull stories, then invite your team with the join link.</p>
+      <div id="lobby-create-err" style="color:var(--warn); font-size:12px; min-height:0; margin-top:6px;"></div>
+      <p class="muted-note">You’ll be the <strong>facilitator</strong>. The passkey gates who can start sessions (and unlocks admin). You start with an empty board — connect ServiceNow to pull stories, then invite your team.</p>
     </div>
     <div class="lobby-demo">
       <div>
@@ -322,7 +347,7 @@
       <button class="btn" onclick="startDemo()">Try the demo</button>
     </div>
     <div class="lobby-list">
-      <div class="lobby-list-hd"><h3>Sessions</h3><button class="btn-ghost-ai" onclick="refreshLobbySessions()">↻ Refresh</button></div>
+      <div class="lobby-list-hd"><h3>Active sessions</h3><button class="btn-ghost-ai" onclick="refreshLobbySessions()">↻ Refresh</button></div>
       <div id="lobby-sessions"></div>
     </div>
   </div>
@@ -469,6 +494,18 @@
   </div>
 </div>
 
+<div class="confirm-ov" id="leave-ov" style="display:none;">
+  <div class="confirm-card" style="max-width:440px;">
+    <h2 style="margin:0 0 4px; font-size:18px;">Leaving the session</h2>
+    <p style="font-size:13px; color:var(--muted); margin:0 0 18px; line-height:1.55;">You’re the facilitator. Keep this session active so the team can rejoin, or end it now so it moves to History and doesn’t pile up on the board.</p>
+    <div style="display:flex; flex-direction:column; gap:10px;">
+      <button class="btn btn-primary" onclick="leaveKeepActive()">Keep session active &amp; leave</button>
+      <button class="btn btn-danger-ghost" onclick="leaveEndSession()">End session &amp; leave</button>
+      <button class="btn" onclick="closeLeavePrompt()">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <script>
 /* ---------- Voters ---------- */
 /* ============================================================
@@ -481,6 +518,17 @@
 const SUPABASE_URL = 'https://vahkbkzqnkxzvwfbsxsy.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_KjJPOQUAn3xQPGvnedOVMw_D1tlTnRA';
 const RT_ENABLED = /^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/i.test(SUPABASE_URL) && !!SUPABASE_ANON_KEY && !SUPABASE_ANON_KEY.includes('YOUR-');
+
+/* Shared team passkey — required to create a session, and unlocks super-admin
+   (closing any active session). CHANGE THIS to your own secret. Set to '' to disable the gate. */
+const TEAM_PASSKEY = 'motorhub';
+/* How long a session stays joinable after its last activity, before it moves to History. */
+const SESSION_TTL_MS = 3*24*60*60*1000;
+function passkeyOk(v){ return !TEAM_PASSKEY || (v||'').trim()===TEAM_PASSKEY; }
+function isSuper(){ try{ return localStorage.getItem('pp_super')==='1'; }catch(e){ return false; } }
+function setSuper(v){ try{ v?localStorage.setItem('pp_super','1'):localStorage.removeItem('pp_super'); }catch(e){} }
+function sessionExpired(s){ const t=Date.parse(s.updated_at||s.created_at||0)||0; return t>0 && (Date.now()-t)>SESSION_TTL_MS; }
+function sessionEnded(s){ return s.status==='completed' || s.status==='ended'; }
 
 let sbClient=null, chan=null;
 /* Stable per-browser id so a refresh re-occupies the same seat (no duplicate presence). */
@@ -628,6 +676,7 @@ async function dbUpdateSession(id, fields){
   try{ return await c.from('sessions').update(Object.assign({updated_at:new Date().toISOString()},fields)).eq('id',id); }catch(e){ return {error:e}; }
 }
 function sessionProgress(){ if(!currentSprint) return {estimated:0,total:0}; const total=currentSprint.stories.length; const estimated=currentSprint.stories.filter(s=>s.points!=null).length; return {estimated,total}; }
+function touchSession(){ if(!demoMode && isAdmin && currentSessionId) dbUpdateSession(currentSessionId, {}); }
 function pushSessionProgress(status){
   if(demoMode || !isAdmin || !currentSessionId) return;
   const p=sessionProgress();
@@ -817,6 +866,33 @@ function renderLobbyIdentity(){
     <span style="font-weight:600;">${me.name}</span>
     <button class="btn-ghost-ai" onclick="showIdentity(showLobby)">edit</button>`;
 }
+function fmtWhen(t){ if(!t) return ''; const d=new Date(t); return d.toLocaleDateString(undefined,{month:'short',day:'numeric'})+' '+d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'}); }
+function expiryLabel(s){
+  const t=Date.parse(s.updated_at||s.created_at||0)||0; if(!t) return '';
+  const left=SESSION_TTL_MS-(Date.now()-t);
+  if(left<=0) return 'expired';
+  const days=Math.floor(left/(24*60*60*1000)), hrs=Math.floor((left%(24*60*60*1000))/(60*60*1000));
+  return days>0?('expires in '+days+'d'):('expires in '+hrs+'h');
+}
+function sessRowHtml(s, kind){
+  const spr=SPRINTS[s.sprint]?SPRINTS[s.sprint].name:(s.sprint||'');
+  const badge = s.status==='completed' ? '<span class="pill pill-done">completed</span>'
+    : s.status==='ended' ? '<span class="pill pill-meta">closed</span>'
+    : sessionExpired(s) ? '<span class="pill pill-meta">expired</span>'
+    : '<span class="pill pill-blue">active</span>';
+  const meta=[spr, (s.estimated||0)+'/'+(s.total||0)+' sized', escapeHtml(s.facilitator||'—'), fmtWhen(s.created_at)].filter(Boolean).join(' · ');
+  const right = kind==='active'
+    ? `${isSuper()?`<button class="btn btn-danger-ghost" onclick="closeSessionFromLobby('${s.id}')" title="Close (admin)">Close</button>`:''}
+       <button class="btn btn-primary" onclick="joinExisting('${s.id}','${s.sprint||''}')">Join</button>`
+    : `<button class="btn" onclick="joinExisting('${s.id}','${s.sprint||''}')">Review</button>`;
+  return `<div class="sess-row">
+    <div class="sess-main">
+      <div class="sess-name">${escapeHtml(s.name||s.id)} ${badge}</div>
+      <div class="sess-sub">${meta}${kind==='active'?' · '+expiryLabel(s):''}</div>
+    </div>
+    <div class="sess-actions">${right}</div>
+  </div>`;
+}
 async function refreshLobbySessions(){
   const listEl=document.getElementById('lobby-sessions'); if(!listEl) return;
   listEl.innerHTML='<div class="muted-note">Loading sessions…</div>';
@@ -824,22 +900,29 @@ async function refreshLobbySessions(){
   if(res.error){ listEl.innerHTML='<div class="muted-note">Shared session history isn’t set up yet — run the setup SQL from the README to enable it. You can still create sessions and join by link.</div>'; return; }
   const data=res.data||[];
   if(!data.length){ listEl.innerHTML='<div class="muted-note">No sessions yet — start one above.</div>'; return; }
-  listEl.innerHTML=data.map(s=>{
-    const done=s.status==='completed';
-    const when=s.created_at?new Date(s.created_at).toLocaleDateString(undefined,{month:'short',day:'numeric'})+' '+new Date(s.created_at).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'}):'';
-    const spr=SPRINTS[s.sprint]?SPRINTS[s.sprint].name:(s.sprint||'');
-    return `<div class="sess-row">
-      <div class="sess-main">
-        <div class="sess-name">${escapeHtml(s.name||s.id)} ${done?'<span class="pill pill-done">completed</span>':'<span class="pill pill-blue">active</span>'}</div>
-        <div class="sess-sub">${escapeHtml(spr)} · ${s.estimated||0}/${s.total||0} sized · ${escapeHtml(s.facilitator||'—')} · ${when}</div>
-      </div>
-      <button class="btn ${done?'':'btn-primary'}" onclick="joinExisting('${s.id}','${s.sprint||''}')">${done?'Review':'Join'}</button>
-    </div>`;
-  }).join('');
+  const active=data.filter(s=>!sessionEnded(s) && !sessionExpired(s));
+  const history=data.filter(s=>sessionEnded(s) || sessionExpired(s));
+  let html='';
+  html+= active.length ? active.map(s=>sessRowHtml(s,'active')).join('') : '<div class="muted-note">No active sessions — start one above.</div>';
+  if(history.length){
+    html+=`<div class="lobby-list-hd" style="margin-top:16px;"><h3 style="margin:0;">History <span style="color:var(--muted); font-weight:400;">· expired &amp; closed</span></h3></div>`;
+    html+=history.map(s=>sessRowHtml(s,'history')).join('');
+  }
+  listEl.innerHTML=html;
 }
 function escapeHtml(s){ return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function joinExisting(id, sprintId){ enterSession(id, sprintId||undefined); }
+function onPasskeyInput(){
+  const v=(document.getElementById('lobby-passkey')||{}).value||'';
+  const err=document.getElementById('lobby-create-err');
+  if(TEAM_PASSKEY && v.trim()===TEAM_PASSKEY){ setSuper(true); if(err) err.textContent=''; refreshLobbySessions(); }
+  else if(!v){ if(err) err.textContent=''; }
+}
 function createSessionFromLobby(){
+  const pass=(document.getElementById('lobby-passkey')||{}).value||'';
+  const err=document.getElementById('lobby-create-err');
+  if(!passkeyOk(pass)){ if(err) err.textContent='Incorrect team passkey — ask your admin for it.'; return; }
+  if(TEAM_PASSKEY) setSuper(true);
   const nameInput=document.getElementById('lobby-sess-name');
   const name=((nameInput&&nameInput.value)||'').trim() || 'Planning session';
   const id=newSessionId(name);
@@ -848,6 +931,14 @@ function createSessionFromLobby(){
   dbCreateSession({id, name, sprint:'', facilitator:me.name, estimated:0, total:0, status:'active'});
   enterSession(id, null);
   setTimeout(()=>askShare(playerLink(id)), 350);
+}
+function closeSessionFromLobby(id){
+  if(!isSuper()) return;
+  askConfirm('Close this session? It moves to History and can no longer be actively joined.', 'Close session', async ()=>{
+    await dbUpdateSession(id, {status:'ended'});
+    refreshLobbySessions();
+    toast('Session closed');
+  });
 }
 
 /* ---------- Enter a session (room) ---------- */
@@ -934,6 +1025,14 @@ function renderUserMenu(){
 function menuSetTheme(t){ setTheme(t); renderUserMenu(); }
 function leaveSession(){
   closeUserMenu();
+  /* A facilitator leaving an active session decides its fate, so active sessions don't pile up. */
+  if(isAdmin && !demoMode && currentSessionId){ document.getElementById('leave-ov').style.display='flex'; return; }
+  doLeave();
+}
+function closeLeavePrompt(){ document.getElementById('leave-ov').style.display='none'; }
+function leaveKeepActive(){ closeLeavePrompt(); toast('Session kept active'); doLeave(); }
+function leaveEndSession(){ const id=currentSessionId; closeLeavePrompt(); dbUpdateSession(id,{status:'ended'}); toast('Session ended'); doLeave(); }
+function doLeave(){
   if(chan){ try{ chan.untrack(); chan.unsubscribe(); }catch(e){} chan=null; }
   endRound();
   demoMode=false; botIn=[]; others={}; revealedVotes={}; currentStory=null; started=false; revealed=false; isAdmin=false; worknotesText=''; allDone=false;
@@ -1042,7 +1141,8 @@ function storyItemHtml(s,idx){
     </div>`;
 }
 function renderStoryList(){
-  if(!currentSprint) return;
+  const el=document.getElementById('storylist'); if(!el) return;
+  if(!currentSprint){ el.innerHTML=''; return; }
   const items=currentSprint.stories.map((s,idx)=>({s,idx}));
   const pending=items.filter(x=>x.s.points==null), done=items.filter(x=>x.s.points!=null);
   let html=pending.map(x=>storyItemHtml(x.s,x.idx)).join('');
@@ -1091,6 +1191,7 @@ function startRound(){
   if(demoMode) scheduleBotVotes();
   renderRoom();
   broadcastState();
+  touchSession();
   toast('Round started — cast your vote');
 }
 function setDuration(v){ roundDuration=parseInt(v)||30; }
@@ -1182,6 +1283,31 @@ function renderRoom(){
     </div>`;
   };
 
+  /* On reveal, replace the radial table with avatars grouped into piles by score. */
+  let stageHtml;
+  if(revealed){
+    const groups={};
+    ps.forEach(p=>{ const k=(p.vote==null?'—':String(p.vote)); (groups[k]=groups[k]||[]).push(p); });
+    const order=DECK.concat(['—']);
+    const keys=Object.keys(groups).sort((a,b)=>order.indexOf(a)-order.indexOf(b));
+    const isCons = t && !t.isTie && t.voters>0;
+    let summary;
+    if(t.voters===0) summary='No votes were cast';
+    else if(t.isTie) summary='⚖ Split vote — '+t.leaders.join(' / ')+' · discuss';
+    else summary='✓ Consensus '+t.leaders[0]+' · '+t.counts[t.leaders[0]]+' of '+t.voters+' agree';
+    const groupsHtml=keys.map(k=>{
+      const arr=groups[k]; const cons=isCons && k===String(t.leaders[0]); const tie=t&&t.isTie&&t.leaders.map(String).includes(k);
+      return `<div class="rg ${k==='—'?'novote':''} ${cons?'consensus':''} ${tie?'tie':''}">
+        <div class="rg-val">${k}</div>
+        <div class="rg-people">${arr.map(p=>`<div class="rg-person"><div class="avatar" style="width:26px;height:26px;font-size:14px;border-width:1px;background:${p.color}">${p.emoji}</div><span>${escapeHtml(p.name)}</span></div>`).join('')}</div>
+        <div class="rg-count">${arr.length} ${arr.length===1?'vote':'votes'}</div>
+      </div>`;
+    }).join('');
+    stageHtml=`<div class="reveal-summary ${t.isTie?'tie':(t.voters?'ok':'')}">${summary}</div><div class="reveal-groups">${groupsHtml}</div>`;
+  } else {
+    stageHtml=`<div class="stage" id="stage"><div class="felt" id="felt">${felt}</div>${ps.map((_,i)=>seatHtml(i)).join('')}</div>`;
+  }
+
   let resultsHtml='';
   if(revealed && t.voters>0){
     if(t.isTie){
@@ -1260,28 +1386,31 @@ function renderRoom(){
         </div>
       </div>
       <div class="bd">
-        <div style="font-size:13px; color:var(--muted); margin-bottom:14px;"><strong style="color:var(--ink);">Short description:</strong> ${s.short}</div>
-        <div class="ai">
-          <div class="ai-hd"><span class="ai-label">✦ AI overview</span>
-            <button class="btn-ghost-ai" onclick="toast('Regenerating overview from Short description + Story Details + Acceptance criteria…')">↻ Regenerate</button></div>
-          <div class="ai-body">${s.ai}</div>
-          <div class="tags">${s.tags.map(x=>`<span class="tag">${x}</span>`).join('')}</div>
-          <div class="src">Summarized from Short description + Story Details + Acceptance criteria · <a href="#" onclick="showSource();return false;">view source fields</a></div>
-        </div>
-        <div class="stage" id="stage">
-          <div class="felt" id="felt">${felt}</div>
-          ${ps.map((_,i)=>seatHtml(i)).join('')}
+        <div class="room-grid">
+          <div class="room-left">
+            <div style="font-size:13px; color:var(--muted); margin-bottom:14px;"><strong style="color:var(--ink);">Short description:</strong> ${s.short}</div>
+            ${s.ai?`<div class="ai">
+              <div class="ai-hd"><span class="ai-label">✦ AI overview</span>
+                <button class="btn-ghost-ai" onclick="toast('Regenerating overview from Short description + Story Details + Acceptance criteria…')">↻ Regenerate</button></div>
+              <div class="ai-body">${s.ai}</div>
+              <div class="tags">${(s.tags||[]).map(x=>`<span class="tag">${x}</span>`).join('')}</div>
+              <div class="src">Summarized from Short description + Story Details + Acceptance criteria · <a href="#" onclick="showSource();return false;">view source fields</a></div>
+            </div>`:''}
+            ${stageHtml}
+          </div>
+          <div class="room-right">
+            <div class="your-card-panel">
+              <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                <div style="font-size:12px; font-weight:700; color:var(--ink);">Your card · Fibonacci</div>
+                <span id="vote-state" class="pill pill-meta"></span>
+              </div>
+              <div class="deck" id="my-deck"></div>
+              <div id="submit-row" style="margin-top:12px;"></div>
+            </div>
+            ${resultsHtml?`<div class="results-panel">${resultsHtml}</div>`:''}
+          </div>
         </div>
       </div>
-      <div class="bd" style="border-top:1px solid var(--line);">
-        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
-          <div style="font-size:12px; font-weight:600; color:var(--muted);">Your card · Fibonacci</div>
-          <span id="vote-state" class="pill pill-meta"></span>
-        </div>
-        <div class="deck" id="my-deck"></div>
-        <div id="submit-row" style="margin-top:12px;"></div>
-      </div>
-      ${resultsHtml?`<div class="bd" style="border-top:1px solid var(--line);">${resultsHtml}</div>`:''}
       ${facBar}
     </div>`;
 
