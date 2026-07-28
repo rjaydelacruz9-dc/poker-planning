@@ -260,27 +260,30 @@
   /* Empty-room call-to-action */
   .side-label{font-weight:700; font-size:14px; color:var(--ink);}
 
-  /* Two-column room: table on the left, your card + results on the right */
-  .room-grid{display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:20px; align-items:start;}
+  /* Two-column room: table left, your card + breakdown + results right.
+     The right column width scales with the viewport (laptop → widescreen). */
+  .room-grid{display:grid; grid-template-columns:minmax(0,1fr) clamp(288px, 24vw, 380px); gap:clamp(16px,2vw,28px); align-items:start;}
   .room-right{position:sticky; top:16px; display:flex; flex-direction:column; gap:14px;}
   .your-card-panel{background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:14px;}
   .results-panel .results{margin:0;}
-  @media(max-width:900px){ .room-grid{grid-template-columns:1fr;} .room-right{position:static;} }
+  /* Stack when the table can't keep a usable width beside the rail */
+  @media(max-width:1024px){ .room-grid{grid-template-columns:1fr;} .room-right{position:static;} }
 
-  /* Reveal: avatars grouped into piles by score */
-  .reveal-summary{text-align:center; font-weight:700; font-size:15px; padding:10px 14px; border-radius:10px; margin-bottom:14px; background:var(--bg); border:1px solid var(--line);}
-  .reveal-summary.ok{background:var(--accent-soft,#e6f4ee); color:var(--accent-dark,#146c4e); border-color:var(--good,#1D9E75);}
-  .reveal-summary.tie{background:var(--warn-soft,#fbeae6); color:var(--warn,#c0392b); border-color:var(--warn,#c0392b);}
-  .reveal-groups{display:flex; gap:12px; flex-wrap:wrap; align-items:flex-start; padding:4px 0 8px;}
-  .rg{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px 12px 10px; min-width:112px; display:flex; flex-direction:column; align-items:center; gap:10px;}
-  .rg-val{font-size:22px; font-weight:800; width:44px; height:44px; border-radius:11px; display:flex; align-items:center; justify-content:center; background:var(--bg); border:1px solid var(--line);}
-  .rg.consensus{border-color:var(--good,#1D9E75); box-shadow:0 0 0 1px var(--good,#1D9E75);}
-  .rg.consensus .rg-val{background:var(--good,#1D9E75); color:#fff; border-color:var(--good,#1D9E75);}
-  .rg.tie .rg-val{background:var(--warn-soft,#fbeae6); color:var(--warn,#c0392b); border-color:var(--warn,#c0392b);}
-  .rg.novote{opacity:.7;}
-  .rg-people{display:flex; flex-direction:column; gap:7px; width:100%;}
-  .rg-person{display:flex; align-items:center; gap:8px; font-size:12px; color:var(--ink);}
-  .rg-count{font-size:11px; color:var(--muted);}
+  /* Score breakdown (right column) */
+  .breakdown-panel{background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:12px 14px;}
+  .breakdown-panel.ok{border-color:var(--good,#1D9E75);}
+  .breakdown-panel.tie{border-color:var(--warn,#c0392b);}
+  .bd-title{font-size:12px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; margin-bottom:10px; display:flex; align-items:center; justify-content:space-between; gap:8px;}
+  .bd-summary{font-size:12px; font-weight:700; text-transform:none; letter-spacing:0; color:var(--ink);}
+  .bd-row{display:flex; align-items:center; gap:10px; padding:7px 0; border-top:1px solid var(--line);}
+  .bd-row:first-of-type{border-top:none;}
+  .bd-val{width:34px; height:34px; flex:none; border-radius:9px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:15px; background:var(--card); border:1px solid var(--line);}
+  .bd-row.cons .bd-val{background:var(--good,#1D9E75); color:#fff; border-color:var(--good,#1D9E75);}
+  .bd-row.tie .bd-val{background:var(--warn-soft,#fbeae6); color:var(--warn,#c0392b); border-color:var(--warn,#c0392b);}
+  .bd-row.novote{opacity:.65;}
+  .bd-avatars{display:flex; flex-wrap:wrap; gap:4px; flex:1;}
+  .bd-av{width:24px; height:24px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:13px; border:1px solid rgba(0,0,0,.12);}
+  .bd-n{font-size:12px; font-weight:700; color:var(--muted); flex:none; min-width:16px; text-align:right;}
   .cta-wrap{display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; padding:40px 20px; text-align:center;}
   .cta-cards{display:flex; gap:16px; flex-wrap:wrap; justify-content:center;}
   .cta-card{width:250px; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:22px 20px; text-align:center; box-shadow:0 4px 14px rgba(0,0,0,.06);}
@@ -1283,29 +1286,31 @@ function renderRoom(){
     </div>`;
   };
 
-  /* On reveal, replace the radial table with avatars grouped into piles by score. */
-  let stageHtml;
-  if(revealed){
+  /* The radial table stays on reveal — cards flip in place to show their values. */
+  const stageHtml=`<div class="stage" id="stage"><div class="felt" id="felt">${felt}</div>${ps.map((_,i)=>seatHtml(i)).join('')}</div>`;
+
+  /* The score breakdown lives in the right column (not replacing the table). */
+  let breakdownHtml='';
+  if(revealed && t){
     const groups={};
     ps.forEach(p=>{ const k=(p.vote==null?'—':String(p.vote)); (groups[k]=groups[k]||[]).push(p); });
     const order=DECK.concat(['—']);
     const keys=Object.keys(groups).sort((a,b)=>order.indexOf(a)-order.indexOf(b));
-    const isCons = t && !t.isTie && t.voters>0;
+    const isCons = !t.isTie && t.voters>0;
     let summary;
     if(t.voters===0) summary='No votes were cast';
-    else if(t.isTie) summary='⚖ Split vote — '+t.leaders.join(' / ')+' · discuss';
-    else summary='✓ Consensus '+t.leaders[0]+' · '+t.counts[t.leaders[0]]+' of '+t.voters+' agree';
-    const groupsHtml=keys.map(k=>{
-      const arr=groups[k]; const cons=isCons && k===String(t.leaders[0]); const tie=t&&t.isTie&&t.leaders.map(String).includes(k);
-      return `<div class="rg ${k==='—'?'novote':''} ${cons?'consensus':''} ${tie?'tie':''}">
-        <div class="rg-val">${k}</div>
-        <div class="rg-people">${arr.map(p=>`<div class="rg-person"><div class="avatar" style="width:26px;height:26px;font-size:14px;border-width:1px;background:${p.color}">${p.emoji}</div><span>${escapeHtml(p.name)}</span></div>`).join('')}</div>
-        <div class="rg-count">${arr.length} ${arr.length===1?'vote':'votes'}</div>
+    else if(t.isTie) summary='⚖ Split — '+t.leaders.join(' / ');
+    else summary='✓ Consensus '+t.leaders[0];
+    const rows=keys.map(k=>{
+      const arr=groups[k]; const cons=isCons && k===String(t.leaders[0]); const tie=t.isTie && t.leaders.map(String).includes(k);
+      return `<div class="bd-row ${cons?'cons':''} ${tie?'tie':''} ${k==='—'?'novote':''}">
+        <div class="bd-val">${k}</div>
+        <div class="bd-avatars">${arr.map(p=>`<span class="bd-av" title="${escapeHtml(p.name)}" style="background:${p.color}">${p.emoji}</span>`).join('')}</div>
+        <div class="bd-n">${arr.length}</div>
       </div>`;
     }).join('');
-    stageHtml=`<div class="reveal-summary ${t.isTie?'tie':(t.voters?'ok':'')}">${summary}</div><div class="reveal-groups">${groupsHtml}</div>`;
-  } else {
-    stageHtml=`<div class="stage" id="stage"><div class="felt" id="felt">${felt}</div>${ps.map((_,i)=>seatHtml(i)).join('')}</div>`;
+    breakdownHtml=`<div class="breakdown-panel ${t.isTie?'tie':(t.voters?'ok':'')}">
+      <div class="bd-title">Breakdown by score <span class="bd-summary">${summary}</span></div>${rows}</div>`;
   }
 
   let resultsHtml='';
@@ -1407,6 +1412,7 @@ function renderRoom(){
               <div class="deck" id="my-deck"></div>
               <div id="submit-row" style="margin-top:12px;"></div>
             </div>
+            ${breakdownHtml}
             ${resultsHtml?`<div class="results-panel">${resultsHtml}</div>`:''}
           </div>
         </div>
