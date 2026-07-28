@@ -39,22 +39,44 @@ Open the gear (facilitator only). Configure:
 - Auth: **Basic** (username/password) or **OAuth 2.0 client credentials**
   (token URL, client ID, client secret)
 
-## ⚠️ Prototype status — before production
+## Live multiplayer (Supabase Realtime)
 
-This is a front‑end prototype. Data, timer, other players, and write‑back are simulated
-in the browser. To make it real:
+Seats, votes, reveals, the timer, and which story is open are synced across everyone in
+the same room via [Supabase Realtime](https://supabase.com/docs/guides/realtime)
+(presence + broadcast) — no database schema required. When you share the join link,
+everyone who opens it joins the **same** live session. Cards stay anonymous until reveal
+(actual values are only broadcast when the facilitator reveals).
 
-1. **Backend / proxy.** ServiceNow Table API calls (and OAuth token exchange) must run
-   server‑side. Never expose a client secret or store credentials in the browser.
-2. **Live multiplayer.** The timer, votes, seats, and "who's the facilitator" need a
-   shared backend (e.g. websocket) so all participants see the same state — today each
-   browser is independent.
-3. **Real auth + roles.** Replace the in‑file facilitator login with real
-   authentication and enforce the facilitator role server‑side.
-4. **Persistence.** Session/resume data currently lives in `localStorage` (per device);
-   move it to the backend so the whole team resumes the same session.
-5. **Write‑back.** Wire `PATCH rm_story/{sys_id}` with `story_points` + `work_notes`.
+**Setup (~5 minutes, one-time):**
+
+1. Create a free project at [supabase.com](https://supabase.com).
+2. In the project: **Settings → API**, copy the **Project URL** and the **anon public** key.
+3. In `planning-poker.html`, near the top of the `<script>` block, fill in:
+   ```js
+   const SUPABASE_URL = 'https://YOUR-PROJECT.supabase.co';
+   const SUPABASE_ANON_KEY = 'YOUR-ANON-PUBLIC-KEY';
+   ```
+   Both are safe to commit — the anon key is a public client key. Commit and redeploy.
+
+If these are left as placeholders, the app runs **single-player** (a live indicator in the
+header shows "Offline · realtime not configured"), which is handy for local testing.
+
+**Rooms.** The room is keyed off the `?session=` parameter in the URL (default
+`motorhub-sprint11`). Use the facilitator's **Copy public join link** button to share it.
+
+## ⚠️ Still prototype-grade — before production
+
+- **ServiceNow data + write-back are still mock.** Stories are built-in demo data and
+  `PATCH rm_story/{sys_id}` isn't wired. Real ServiceNow access needs a **server-side
+  proxy** (never expose credentials/secrets in the browser).
+- **Facilitator auth is client-side.** The in-file `admin` / `admin123` login is not real
+  security — anyone with the password (or devtools) can facilitate. Enforce roles
+  server-side for production.
+- **Room state has no persistent store.** Realtime presence/broadcast is ephemeral; if the
+  facilitator leaves mid-round, live round state is lost (confirmed estimates are still
+  kept in `localStorage` per device). Move to a shared store for durable sessions.
 
 ## Run
 
-Open `planning-poker.html` in any modern browser. That's it.
+- **Live:** deploy the folder (e.g. Vercel) with Supabase configured, then share the join link.
+- **Local/offline:** open `planning-poker.html` in any modern browser (single-player).

@@ -216,6 +216,7 @@
   .confirm-card .msg{font-size:14px; margin-bottom:20px; color:var(--ink); line-height:1.55;}
   .confirm-card .row{display:flex; justify-content:flex-end; gap:10px;}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 <h1 class="sr-only">Sprint planning poker for ServiceNow agile management</h1>
@@ -244,7 +245,7 @@
 <header class="appbar" style="display:none;" id="appbar">
   <div class="brand"><span class="logo">♠</span> Sprint Planning Poker</div>
   <div class="right">
-    <span class="sync"><span class="dot"></span> ServiceNow · Motorhub</span>
+    <span class="sync" id="live-status"><span class="dot"></span> ServiceNow · Motorhub</span>
     <select class="theme-select" id="theme" onchange="setTheme(this.value)">
       <option value="cream">Cream</option>
       <option value="light">Light</option>
@@ -371,13 +372,122 @@
 
 <script>
 /* ---------- Voters ---------- */
-const BOTS=[
-  {n:'Ava M.', i:'AM', emoji:'🦍', color:'#E24B4A'},
-  {n:'Raj K.', i:'RK', emoji:'🐦', color:'#378ADD'},
-  {n:'Jo D.',  i:'JD', emoji:'🐱', color:'#1D9E75'},
-  {n:'Mia P.', i:'MP', emoji:'🦫', color:'#BA7517'},
-  {n:'Sam T.', i:'ST', emoji:'🦁', color:'#7F77DD'},
-];
+/* ============================================================
+   Realtime backend (Supabase) — live rooms, presence & voting.
+   1. Create a free project at https://supabase.com
+   2. Project Settings → API → copy the Project URL and the anon public key
+   3. Paste them below (both are safe to commit — the anon key is public).
+   If left as placeholders, the app runs single-player (no shared room).
+   ============================================================ */
+const SUPABASE_URL = 'https://vahkbkzqnkxzvwfbsxsy.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_KjJPOQUAn3xQPGvnedOVMw_D1tlTnRA';
+const RT_ENABLED = /^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/i.test(SUPABASE_URL) && !!SUPABASE_ANON_KEY && !SUPABASE_ANON_KEY.includes('YOUR-');
+
+let sbClient=null, chan=null;
+/* Stable per-browser id so a refresh re-occupies the same seat (no duplicate presence). */
+let myId = (function(){
+  try{
+    let id=localStorage.getItem('pp_clientid');
+    if(!id){ id=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():'u'+Math.random().toString(36).slice(2)+Date.now().toString(36); localStorage.setItem('pp_clientid',id); }
+    return id;
+  }catch(e){ return 'u'+Math.random().toString(36).slice(2)+Date.now().toString(36); }
+})();
+let others = {};        /* id -> {id,name,initials,emoji,color,isAdmin,voted} */
+let revealedVotes = {}; /* id -> pick value, populated only on reveal */
+let facilitatorId = null;
+
+function roomId(){
+  try{ return new URL(location.href).searchParams.get('session') || 'motorhub-sprint11'; }
+  catch(e){ return 'motorhub-sprint11'; }
+}
+function myPresence(){
+  return { id:myId, name:me.name, initials:me.initials, emoji:me.emoji, color:me.color, isAdmin:!!isAdmin, voted:!!submitted };
+}
+function ensureRealtime(){
+  if(!RT_ENABLED){ updateLiveStatus(); return; }
+  if(chan){ updatePresence(); return; }
+  try{
+    sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    chan = sbClient.channel('pp-'+roomId(), { config:{ presence:{ key:myId } } });
+    chan.on('presence', { event:'sync' }, rebuildPresence);
+    chan.on('broadcast', { event:'state' }, ({payload})=>applyState(payload));
+    chan.on('broadcast', { event:'reveal-vote' }, ({payload})=>{ revealedVotes[payload.id]=payload.pick; if(currentStory) renderRoom(); });
+    chan.on('broadcast', { event:'sync-request' }, ()=>{ if(isAdmin) broadcastState(); });
+    chan.subscribe(async (status)=>{
+      if(status==='SUBSCRIBED'){
+        await chan.track(myPresence());
+        chan.send({ type:'broadcast', event:'sync-request', payload:{ id:myId } });
+        updateLiveStatus();
+      }
+    });
+  }catch(e){ console.error('Realtime init failed', e); updateLiveStatus(); }
+}
+function updatePresence(){ if(chan){ try{ chan.track(myPresence()); }catch(e){} } }
+function rebuildPresence(){
+  if(!chan) return;
+  const st = chan.presenceState();
+  others = {};
+  Object.values(st).forEach(arr=>arr.forEach(m=>{ if(m && m.id && m.id!==myId) others[m.id]=m; }));
+  const roster = [ myPresence(), ...Object.values(others) ];
+  const admins = roster.filter(p=>p.isAdmin).map(p=>p.id);
+  facilitatorId = admins.includes(facilitatorId) ? facilitatorId : (admins[0]||null);
+  updateLiveStatus();
+  if(currentStory){ renderRoom(); maybeAutoReveal(); } else { renderStoryList(); }
+}
+function broadcastState(){
+  if(!chan || !isAdmin) return;
+  chan.send({ type:'broadcast', event:'state', payload:{
+    by:myId, sprintId:currentSprintId, storyId:currentStory?currentStory.id:null,
+    started, revealed, endsAt:roundEndsAt, roundId, done:allDone,
+    estimates:gatherEstimates(), votes:revealed?revealedVotes:null
+  }});
+}
+function applyState(s){
+  if(!s || s.by===myId) return;
+  if(s.estimates) Object.entries(s.estimates).forEach(([id,pts])=>setStoryPoints(id,pts));
+  if(s.sprintId && s.sprintId!==currentSprintId){
+    currentSprintId=s.sprintId; currentSprint=SPRINTS[s.sprintId];
+    const sel=document.getElementById('sprint'); if(sel) sel.value=s.sprintId; updateMeta();
+  }
+  renderStoryList();
+  if(s.done && !s.storyId){ showAllDone(); return; }
+  /* Only FORCE everyone onto the facilitator's story while a round is in progress.
+     When idle (not started), players are free to browse the backlog on their own. */
+  if(s.started && s.storyId && currentSprint){
+    const st=currentSprint.stories.find(x=>x.id===s.storyId);
+    if(st){
+      const changed = !currentStory || currentStory.id!==s.storyId;
+      currentStory=st;
+      if(changed){ facilitatorChoice=null; tieSpeakers=[]; }
+      document.getElementById('empty').style.display='none';
+      document.getElementById('room').style.display='block';
+    }
+  }
+  if(typeof s.roundId==='number' && s.roundId!==seenRound){
+    seenRound=s.roundId; myPick=null; submitted=false; revealedVotes={}; facilitatorChoice=null; tieSpeakers=[]; updatePresence();
+  }
+  const wasRevealed=revealed;
+  started=!!s.started; revealed=!!s.revealed; roundEndsAt=s.endsAt||0;
+  if(s.votes) Object.assign(revealedVotes, s.votes);
+  if(revealed && !wasRevealed) sendMyVote();
+  syncTimer();
+  if(currentStory) renderRoom();
+}
+function sendMyVote(){
+  const mine = submitted ? (myPick||null) : null;
+  revealedVotes[myId]=mine;
+  if(chan) chan.send({ type:'broadcast', event:'reveal-vote', payload:{ id:myId, pick:mine } });
+}
+function gatherEstimates(){ const m={}; Object.values(SPRINTS).forEach(sp=>sp.stories.forEach(s=>{ if(s.points!=null) m[s.id]=s.points; })); return m; }
+function setStoryPoints(id,pts){ Object.values(SPRINTS).forEach(sp=>sp.stories.forEach(s=>{ if(s.id===id) s.points=pts; })); }
+function updateLiveStatus(){
+  const el=document.getElementById('live-status'); if(!el) return;
+  if(!RT_ENABLED){ el.innerHTML='<span class="dot" style="background:#c9803a;"></span> Offline · realtime not configured'; return; }
+  const n = 1 + Object.keys(others).length;
+  el.innerHTML=`<span class="dot"></span> Live · ${n} in room`;
+}
+
+const BOTS=[];
 const DECK=['0','1','2','3','5','8','13','21','?','☕'];
 const EMOJIS=['🐭','🦍','🐱','🐦','🦜','🕊️','🐺','🦫','🦁','🦊','🐼','🦉','🐙','🐯','🦄'];
 const COLORS=['#E24B4A','#D85A30','#BA7517','#639922','#1D9E75','#378ADD','#534AB7','#7F77DD','#D4537E','#5F5E5A'];
@@ -456,11 +566,11 @@ const SPRINTS={
 
 /* ---------- State ---------- */
 let me={name:'You', initials:'YOU', emoji:'🐭', color:'#E24B4A'};
-let currentSprint=null, currentStory=null;
+let currentSprint=null, currentStory=null, currentSprintId='s1';
 let started=false, revealed=false, myPick=null, submitted=false, facilitatorChoice=null;
-let seatOrder=[], tieSpeakers=[], botIn=[];
+let tieSpeakers=[];
 let selEmoji='🐭', selColor='#E24B4A';
-let roundToken=0, botTimers=[], timerInt=null, remaining=0, roundDuration=30;
+let timerInt=null, remaining=0, roundDuration=30, roundEndsAt=0, roundId=0, seenRound=0, allDone=false;
 
 /* ---------- Storage ---------- */
 function save(k,v){ try{localStorage.setItem(k,JSON.stringify(v));}catch(e){} }
@@ -512,20 +622,29 @@ function startApp(){
   document.getElementById('chip-name').textContent=me.name;
   updateRoleChip();
   loadSprint();
+  ensureRealtime();
+  updateLiveStatus();
 }
 
 /* ---------- Participants ---------- */
 function participants(){
-  const arr=BOTS.map((b,i)=>({name:b.n, initials:b.i, emoji:b.emoji, color:b.color, vote:(botIn[i]&&currentStory)?currentStory.votes[i]:null, isMe:false}));
-  arr.push({name:me.name+' (you)', initials:me.initials, emoji:me.emoji, color:me.color, vote:submitted?myPick:null, isMe:true});
-  return arr;
+  const roster=[ myPresence(), ...Object.values(others) ];
+  roster.sort((a,b)=> a.id<b.id?-1:(a.id>b.id?1:0));
+  return roster.map(p=>{
+    const isMe=p.id===myId;
+    const voted=isMe?!!submitted:!!p.voted;
+    let vote=null;
+    if(revealed){ vote = isMe ? (submitted ? (myPick||null) : null) : (revealedVotes[p.id]!==undefined ? revealedVotes[p.id] : null); }
+    return { id:p.id, name:isMe?(me.name+' (you)'):p.name, initials:p.initials, emoji:p.emoji, color:p.color, isMe, voted, vote };
+  });
 }
 function shuffle(arr){const a=arr.slice(); for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]];} return a;}
-function allVoted(){ return participants().every(p=>p.vote!=null); }
+function allVoted(){ const ps=participants(); return ps.length>0 && ps.every(p=>p.voted); }
 
 /* ---------- Lobby ---------- */
-function loadSprint(){ currentSprint=SPRINTS[document.getElementById('sprint').value]; updateMeta(); renderStoryList(); }
+function loadSprint(){ currentSprintId=document.getElementById('sprint').value; currentSprint=SPRINTS[currentSprintId]; updateMeta(); renderStoryList(); if(isAdmin) broadcastState(); }
 function updateMeta(){
+  if(!currentSprint) return;
   const meta=document.getElementById('sprint-meta');
   const est=currentSprint.stories.filter(s=>s.points!=null).length;
   meta.style.display='block';
@@ -540,6 +659,7 @@ function storyItemHtml(s,idx){
     </div>`;
 }
 function renderStoryList(){
+  if(!currentSprint) return;
   const items=currentSprint.stories.map((s,idx)=>({s,idx}));
   const pending=items.filter(x=>x.s.points==null), done=items.filter(x=>x.s.points!=null);
   let html=pending.map(x=>storyItemHtml(x.s,x.idx)).join('');
@@ -549,34 +669,64 @@ function renderStoryList(){
 }
 
 /* ---------- Round control ---------- */
-function endRound(){ roundToken++; botTimers.forEach(clearTimeout); botTimers=[]; stopTimer(); }
+function endRound(){ stopTimer(); }
+/* A round is "locked" from the moment the facilitator starts voting until it's reset
+   or written back. While locked, everyone is pinned to the active story. */
+function roundLocked(){ return started; }
 function openStory(idx){
-  endRound();
-  currentStory=currentSprint.stories[idx];
-  started=false; revealed=false; myPick=null; submitted=false; facilitatorChoice=null; tieSpeakers=[]; botIn=BOTS.map(()=>false); remaining=0;
-  seatOrder=shuffle(participants().map((_,i)=>i));
-  renderStoryList();
-  document.getElementById('empty').style.display='none';
-  document.getElementById('room').style.display='block';
-  renderRoom();
+  const st=currentSprint && currentSprint.stories[idx];
+  if(!st) return;
+  if(roundLocked() && !isAdmin){ toast('Planning in progress — everyone stays on the current story'); return; }
+  if(isAdmin){
+    /* Facilitator opens/switches story → fresh idle round on it; players unlock (they follow on Start). */
+    endRound();
+    allDone=false;
+    currentStory=st;
+    started=false; revealed=false; myPick=null; submitted=false; facilitatorChoice=null; tieSpeakers=[]; revealedVotes={}; roundEndsAt=0; remaining=0;
+    roundId++; seenRound=roundId; updatePresence();
+    renderStoryList();
+    document.getElementById('empty').style.display='none';
+    document.getElementById('room').style.display='block';
+    renderRoom();
+    broadcastState();
+  } else {
+    /* Player browsing the backlog while idle → local preview only, no broadcast. */
+    currentStory=st;
+    renderStoryList();
+    document.getElementById('empty').style.display='none';
+    document.getElementById('room').style.display='block';
+    renderRoom();
+  }
 }
 function startRound(){
+  if(!isAdmin) return;
   endRound();
-  const tk=++roundToken;
-  started=true; revealed=false; myPick=null; submitted=false; facilitatorChoice=null; tieSpeakers=[]; botIn=BOTS.map(()=>false);
-  seatOrder=shuffle(participants().map((_,i)=>i));
-  startTimer();
-  BOTS.forEach((b,i)=>{
-    const delay=1400+Math.random()*5600;
-    botTimers.push(setTimeout(()=>{ if(tk!==roundToken||revealed) return; botIn[i]=true; renderRoom(); maybeAutoReveal(); }, delay));
-  });
+  started=true; revealed=false; myPick=null; submitted=false; facilitatorChoice=null; tieSpeakers=[]; revealedVotes={};
+  roundId++; seenRound=roundId; updatePresence();
+  roundEndsAt=Date.now()+roundDuration*1000;
+  syncTimer();
   renderRoom();
+  broadcastState();
   toast('Round started — cast your vote');
 }
 function setDuration(v){ roundDuration=parseInt(v)||30; }
-function startTimer(){ remaining=roundDuration; clearInterval(timerInt); updateTimerDisplay(); timerInt=setInterval(()=>{ remaining--; if(remaining<0)remaining=0; updateTimerDisplay(); if(remaining<=0){ stopTimer(); onTimeUp(); } },1000); }
+function syncTimer(){
+  clearInterval(timerInt); timerInt=null;
+  if(started && !revealed && roundEndsAt>Date.now()){
+    tickTimer();
+    timerInt=setInterval(tickTimer,1000);
+  } else {
+    remaining = (started && !revealed) ? 0 : roundDuration;
+    updateTimerDisplay();
+  }
+}
+function tickTimer(){
+  remaining=Math.max(0, Math.round((roundEndsAt-Date.now())/1000));
+  updateTimerDisplay();
+  if(remaining<=0){ clearInterval(timerInt); timerInt=null; onTimeUp(); }
+}
 function stopTimer(){ clearInterval(timerInt); timerInt=null; }
-function onTimeUp(){ if(revealed||!started) return; toast("Time's up — revealing cards"); toggleReveal(); }
+function onTimeUp(){ if(revealed||!started) return; if(isAdmin){ toast("Time's up — revealing cards"); toggleReveal(); } }
 function fmt(s){ const m=Math.floor(s/60), ss=s%60; return String(m).padStart(2,'0')+':'+String(ss).padStart(2,'0'); }
 function updateTimerDisplay(){ const v=fmt(remaining), urgent=remaining<=5;
   const a=document.getElementById('timer-val'); if(a){ a.textContent=v; a.style.color=urgent?'#ff6b6b':''; }
@@ -590,18 +740,17 @@ function tally(){
   const leaders=entries.filter(e=>e[1]===max).map(e=>e[0]);
   return {counts, entries, leaders, isTie:leaders.length>1, voters:ps.length};
 }
-function pickSpeakers(leaders){
-  const ps=participants();
-  return leaders.map(val=>{ const idxs=ps.map((p,i)=>p.vote===val?i:-1).filter(i=>i>=0); return {value:val, pIdx:idxs[Math.floor(Math.random()*idxs.length)]}; });
+function pickSpeakers(ps,leaders){
+  return leaders.map(val=>{ const cands=ps.filter(p=>p.vote===val); const pick=cands[Math.floor(Math.random()*cands.length)]; return {value:val, pid:pick?pick.id:null}; });
 }
 
 /* ---------- Render room ---------- */
 function renderRoom(){
   const s=currentStory, ps=participants();
   const t=revealed?tally():null;
-  if(revealed && t.isTie && tieSpeakers.length===0) tieSpeakers=pickSpeakers(t.leaders);
-  const votedCount=ps.filter(p=>p.vote!=null).length;
-  const waitingNames=ps.filter(p=>p.vote==null).map(p=>p.isMe?'You':p.name);
+  if(revealed && t.isTie && tieSpeakers.length===0) tieSpeakers=pickSpeakers(ps,t.leaders);
+  const votedCount=ps.filter(p=>p.voted).length;
+  const waitingNames=ps.filter(p=>!p.voted).map(p=>p.isMe?'You':p.name);
 
   let felt;
   if(!started){
@@ -620,18 +769,18 @@ function renderRoom(){
 
   const seatHtml=pIdx=>{
     const p=ps[pIdx];
-    const isSpeaker=tieSpeakers.some(sp=>sp.pIdx===pIdx);
-    const waiting=started && !revealed && p.vote==null;
+    const isSpeaker=tieSpeakers.some(sp=>sp.pid===p.id);
+    const waiting=started && !revealed && !p.voted;
     let faceInner, faceClass='seat-card';
     if(!revealed){
-      if(p.vote==null){ faceClass+=' pending'; faceInner='<span class="qm">'+(p.isMe?'·':'?')+'</span>'; }
+      if(!p.voted){ faceClass+=' pending'; faceInner='<span class="qm">'+(p.isMe?'·':'?')+'</span>'; }
       else { faceClass+=' hidden'+(started?' live':''); faceInner='<span class="qm">♠</span>'; }
     } else {
       if(p.vote==null){ faceClass+=' pending'; faceInner='<span class="qm">—</span>'; }
       else { faceClass+=' reveal-anim'; faceInner=`<span class="num">${p.vote}</span>`; if(isSpeaker) faceClass+=' picked-tie'; }
     }
     let st='';
-    if(started && !revealed) st = p.vote!=null ? 'ready' : (p.isMe?'your turn':'thinking…');
+    if(started && !revealed) st = p.voted ? 'ready' : (p.isMe?'your turn':'thinking…');
     return `<div class="seat ${waiting?'waiting':''}">
       <div class="${faceClass}">${faceInner}</div>
       <div class="avatar ${p.isMe?'me':''}" style="background:${p.color}">${p.emoji}</div>
@@ -643,7 +792,7 @@ function renderRoom(){
   let resultsHtml='';
   if(revealed && t.voters>0){
     if(t.isTie){
-      const spk=tieSpeakers.map(sp=>{ const p=ps[sp.pIdx];
+      const spk=tieSpeakers.map(sp=>{ const p=ps.find(x=>x.id===sp.pid); if(!p) return '';
         return `<div class="speaker"><div class="av" style="background:${p.color}">${p.emoji}</div>
           <div><div class="who">${p.name}</div><div class="voted">voted ${sp.value} — share your reasoning</div></div></div>`;}).join('');
       resultsHtml=`<div class="results tie">
@@ -728,7 +877,7 @@ function renderRoom(){
         </div>
         <div class="stage" id="stage">
           <div class="felt" id="felt">${felt}</div>
-          ${seatOrder.map(seatHtml).join('')}
+          ${ps.map((_,i)=>seatHtml(i)).join('')}
         </div>
       </div>
       <div class="bd" style="border-top:1px solid var(--line);">
@@ -799,13 +948,13 @@ function pick(c){ if(!started||submitted||revealed) return; myPick=(myPick===c?n
 function submitVote(){
   if(!myPick||submitted||revealed||!started) return;
   askConfirm(`Lock in your vote of ${myPick}? Once submitted you can't change it this round.`, 'Submit vote', ()=>{
-    submitted=true; renderRoom(); toast('Vote submitted — card face down'); maybeAutoReveal();
+    submitted=true; updatePresence(); renderRoom(); toast('Vote submitted — card face down'); maybeAutoReveal();
   });
 }
 function maybeAutoReveal(){
-  if(started && !revealed && allVoted()){
+  if(isAdmin && started && !revealed && allVoted()){
     toast('Everyone locked in — revealing cards');
-    setTimeout(()=>{ if(started && !revealed && allVoted()) toggleReveal(); }, 800);
+    setTimeout(()=>{ if(isAdmin && started && !revealed && allVoted()) toggleReveal(); }, 800);
   }
 }
 function renderConsensusDeck(){
@@ -815,10 +964,23 @@ function renderConsensusDeck(){
   el.innerHTML=options.map(c=>`<button class="pcard ${c===facilitatorChoice?'sel':''}" onclick="chooseConfirmed('${c}')">${c}</button>`).join('');
 }
 function chooseConfirmed(c){ facilitatorChoice=c; renderConsensusDeck(); }
-function toggleReveal(){ if(!revealed){ revealed=true; roundToken++; botTimers.forEach(clearTimeout); botTimers=[]; stopTimer(); } else { revealed=false; facilitatorChoice=null; tieSpeakers=[]; } renderRoom(); }
+function toggleReveal(){
+  if(!isAdmin) return;
+  if(!revealed){ revealed=true; roundEndsAt=0; stopTimer(); sendMyVote(); }
+  else { revealed=false; facilitatorChoice=null; tieSpeakers=[]; revealedVotes={}; }
+  syncTimer(); renderRoom(); broadcastState();
+}
 function confirmReset(){ askConfirm("Reset the round? This clears everyone's votes and reshuffles the table.", 'Reset round', ()=>{ resetRound(); }); }
-function resetRound(){ endRound(); started=false; revealed=false; myPick=null; submitted=false; facilitatorChoice=null; tieSpeakers=[]; botIn=BOTS.map(()=>false); remaining=0; seatOrder=shuffle(participants().map((_,i)=>i)); renderRoom(); toast('Round reset — press Start to vote again'); }
+function resetRound(){
+  if(!isAdmin) return;
+  endRound();
+  started=false; revealed=false; myPick=null; submitted=false; facilitatorChoice=null; tieSpeakers=[]; revealedVotes={}; roundEndsAt=0; remaining=0;
+  roundId++; seenRound=roundId; updatePresence();
+  syncTimer(); renderRoom(); broadcastState();
+  toast('Round reset — press Start to vote again');
+}
 function writeBack(){
+  if(!isAdmin) return;
   if(!facilitatorChoice){ toast('Select the confirmed estimate first'); return; }
   const notes=(document.getElementById('worknotes')||{}).value||'';
   const allVotes=participants().filter(p=>p.vote!=null).map(p=>p.vote).join(', ');
@@ -827,19 +989,22 @@ function writeBack(){
   currentStory.points=parseInt(facilitatorChoice)||facilitatorChoice;
   recordEstimate(currentStory.id, currentStory.points);
   renderStoryList(); updateMeta();
+  broadcastState();
   toast(`✓ ${currentStory.id} → ${facilitatorChoice} pts written to ServiceNow · work note added`);
   console.log('WRITE-BACK payload →', {story:currentStory.id, story_points:facilitatorChoice, work_notes:workNote});
   endRound();
   const nextIdx=currentSprint.stories.findIndex(s=>s.points==null);
   setTimeout(()=>{
     if(nextIdx>=0){ toast('Moving everyone to the next story'); openStory(nextIdx); }
-    else {
-      document.getElementById('room').style.display='none';
-      const e=document.getElementById('empty');
-      e.innerHTML='<div style="font-size:40px;">🎉</div><div style="font-weight:600; color:var(--muted); margin-bottom:4px;">All stories estimated</div><div>Every story in this sprint has a confirmed estimate.</div>';
-      e.style.display='flex'; currentStory=null;
-    }
+    else { allDone=true; currentStory=null; showAllDone(); broadcastState(); }
   }, 1100);
+}
+function showAllDone(){
+  allDone=true; currentStory=null; stopTimer();
+  const room=document.getElementById('room'); if(room) room.style.display='none';
+  const e=document.getElementById('empty'); if(!e) return;
+  e.innerHTML='<div style="font-size:40px;">🎉</div><div style="font-weight:600; color:var(--muted); margin-bottom:4px;">All stories estimated</div><div>Every story in this sprint has a confirmed estimate.</div>';
+  e.style.display='flex';
 }
 function showSource(){ toast('Story Details: "'+currentStory.details.slice(0,110)+'…"  |  Acceptance criteria: "'+currentStory.criteria.slice(0,80)+'…"'); }
 
@@ -857,7 +1022,7 @@ function updateRoleChip(){
   if(isAdmin){ chip.className='role-chip fac'; chip.innerHTML='🔒 Facilitator · sign out'; if(gear) gear.style.display='flex'; }
   else { chip.className='role-chip player'; chip.innerHTML='👤 Player · sign in as facilitator'; if(gear) gear.style.display='none'; }
 }
-function signOutFacilitator(){ isAdmin=false; updateRoleChip(); if(currentStory) renderRoom(); toast('Signed out — you are a player'); }
+function signOutFacilitator(){ isAdmin=false; updateRoleChip(); updatePresence(); if(currentStory) renderRoom(); toast('Signed out — you are a player'); }
 function openAdmin(){ if(!isAdmin){ showAdminLogin(openAdminPanel); return; } openAdminPanel(); }
 function showAdminLogin(after){
   _afterLogin=after||null;
@@ -870,7 +1035,7 @@ function closeAdminLogin(){ document.getElementById('adminlogin-ov').style.displ
 function loginAdmin(){
   const u=document.getElementById('adm-login-user').value, p=document.getElementById('adm-login-pass').value;
   if(u===cfg.adminUser && p===cfg.adminPass){
-    isAdmin=true; closeAdminLogin(); updateRoleChip(); if(currentStory) renderRoom();
+    isAdmin=true; closeAdminLogin(); updateRoleChip(); updatePresence(); if(currentStory) renderRoom();
     const fn=_afterLogin; _afterLogin=null; if(fn) fn();
     toast('Signed in as facilitator');
   } else { document.getElementById('adm-login-err').textContent='Incorrect username or password.'; }
