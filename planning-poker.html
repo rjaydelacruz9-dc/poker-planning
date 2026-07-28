@@ -224,21 +224,33 @@
 
   /* User menu dropdown */
   .user-wrap{position:relative;}
-  .user-menu{position:absolute; right:0; top:calc(100% + 8px); background:var(--card); border:1px solid var(--line); border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.22); padding:8px; min-width:230px; z-index:60;}
-  .um-head{display:flex; align-items:center; gap:8px; padding:6px 8px 10px; font-weight:600; color:var(--ink); border-bottom:1px solid var(--line); margin-bottom:6px;}
-  .um-item{display:block; width:100%; text-align:left; background:none; border:none; padding:9px 8px; border-radius:8px; font-size:13px; color:var(--ink); cursor:pointer;}
-  .um-item:hover{background:var(--bg);}
-  .um-label{font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; padding:8px 8px 4px;}
-  .um-themes{display:grid; grid-template-columns:1fr 1fr; gap:6px; padding:2px 6px 6px;}
-  .um-theme{border:1px solid var(--line); background:var(--bg); color:var(--ink); border-radius:7px; padding:7px 8px; font-size:12px; cursor:pointer;}
-  .um-theme.sel{border-color:var(--accent,#378ADD); box-shadow:0 0 0 1px var(--accent,#378ADD) inset; font-weight:600;}
-  .um-sep{height:1px; background:var(--line); margin:6px 0;}
+  .user-menu{position:absolute; right:0; top:calc(100% + 8px); background:var(--card); border:1px solid var(--line); border-radius:14px; box-shadow:0 16px 40px rgba(0,0,0,.28); padding:8px; min-width:268px; z-index:60;}
+  .um-profile{display:flex; align-items:center; gap:12px; padding:10px 10px 12px; margin-bottom:6px; border-bottom:1px solid var(--line);}
+  .um-profile-txt{min-width:0;}
+  .um-name{font-weight:700; font-size:15px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .um-role{font-size:11px; margin-top:2px; display:inline-block; padding:2px 8px; border-radius:999px; font-weight:600;}
+  .um-role.fac{background:var(--good,#1D9E75); color:#fff;}
+  .um-role.ply{background:var(--bg); color:var(--muted); border:1px solid var(--line);}
+  .um-row{display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:none; border:none; padding:10px 10px; border-radius:9px; font-size:13.5px; color:var(--ink); cursor:pointer;}
+  .um-row:hover{background:var(--bg);}
+  .um-row .um-txt{flex:1;}
+  .um-row .um-chev{color:var(--muted); font-size:16px;}
+  .um-row.danger{color:#c0392b;}
+  .um-ico{width:20px; text-align:center;}
+  .um-group-label{font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; padding:10px 10px 4px; font-weight:600;}
+  .um-themes{display:grid; grid-template-columns:1fr 1fr; gap:6px; padding:2px 8px 8px;}
+  .um-theme{display:flex; align-items:center; gap:8px; border:1px solid var(--line); background:var(--bg); color:var(--ink); border-radius:9px; padding:8px 9px; font-size:12px; cursor:pointer;}
+  .um-theme.sel{border-color:var(--good,#1D9E75); box-shadow:0 0 0 1px var(--good,#1D9E75) inset; font-weight:600;}
+  .um-swatch{width:14px; height:14px; border-radius:4px; border:1px solid rgba(0,0,0,.15); flex:none;}
+  .um-sep{height:1px; background:var(--line); margin:6px 4px;}
 
   /* Lobby */
   .lobby-card{background:var(--card); border-radius:18px; box-shadow:0 20px 60px rgba(0,0,0,.25); width:min(680px,92vw); max-height:90vh; overflow:auto; padding:26px 28px;}
   .lobby-top{display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:20px;}
   .lobby-me{display:flex; align-items:center; gap:8px; background:var(--bg); border:1px solid var(--line); border-radius:999px; padding:6px 10px 6px 8px; font-size:13px;}
-  .lobby-create{background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:20px;}
+  .lobby-create{background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:14px;}
+  .lobby-demo{display:flex; align-items:center; justify-content:space-between; gap:14px; border:1px dashed var(--line); border-radius:12px; padding:12px 16px; margin-bottom:20px;}
+  .lobby-demo button{white-space:nowrap;}
   .lobby-create h3, .lobby-list h3{margin:0 0 12px; font-size:14px;}
   .lobby-create-row{display:flex; gap:8px; flex-wrap:wrap;}
   .lobby-create-row input{flex:2; min-width:180px;}
@@ -269,6 +281,13 @@
         <button class="btn btn-primary" onclick="createSessionFromLobby()">Create &amp; host</button>
       </div>
       <p class="muted-note">You’ll be the <strong>facilitator</strong>. Share the join link with your team — they join as players, no login needed.</p>
+    </div>
+    <div class="lobby-demo">
+      <div>
+        <div style="font-weight:600; font-size:14px;">🎮 Just exploring?</div>
+        <div class="muted-note" style="margin-top:2px;">Try a solo demo — you facilitate while a table of bots votes along. Nothing is saved or shared.</div>
+      </div>
+      <button class="btn" onclick="startDemo()">Try the demo</button>
     </div>
     <div class="lobby-list">
       <div class="lobby-list-hd"><h3>Sessions</h3><button class="btn-ghost-ai" onclick="refreshLobbySessions()">↻ Refresh</button></div>
@@ -458,6 +477,7 @@ function ensureRealtime(){
     chan.on('presence', { event:'sync' }, rebuildPresence);
     chan.on('broadcast', { event:'state' }, ({payload})=>applyState(payload));
     chan.on('broadcast', { event:'reveal-vote' }, ({payload})=>{ revealedVotes[payload.id]=payload.pick; if(currentStory) renderRoom(); });
+    chan.on('broadcast', { event:'results' }, ({payload})=>applyResults(payload));
     chan.on('broadcast', { event:'sync-request' }, ()=>{ if(isAdmin) broadcastState(); });
     chan.subscribe(async (status)=>{
       if(status==='SUBSCRIBED'){
@@ -485,7 +505,8 @@ function broadcastState(){
   chan.send({ type:'broadcast', event:'state', payload:{
     by:myId, sprintId:currentSprintId, storyId:currentStory?currentStory.id:null,
     started, revealed, endsAt:roundEndsAt, roundId, done:allDone,
-    estimates:gatherEstimates(), votes:revealed?revealedVotes:null
+    estimates:gatherEstimates(), votes:revealed?revealedVotes:null,
+    choice:revealed?facilitatorChoice:null, worknotes:revealed?worknotesText:''
   }});
 }
 function applyState(s){
@@ -510,11 +531,12 @@ function applyState(s){
     }
   }
   if(typeof s.roundId==='number' && s.roundId!==seenRound){
-    seenRound=s.roundId; myPick=null; submitted=false; revealedVotes={}; facilitatorChoice=null; tieSpeakers=[]; updatePresence();
+    seenRound=s.roundId; myPick=null; submitted=false; revealedVotes={}; facilitatorChoice=null; tieSpeakers=[]; worknotesText=''; updatePresence();
   }
   const wasRevealed=revealed;
   started=!!s.started; revealed=!!s.revealed; roundEndsAt=s.endsAt||0;
   if(s.votes) Object.assign(revealedVotes, s.votes);
+  if(!isAdmin && s.revealed){ if(s.choice!==undefined && s.choice!==null) facilitatorChoice=s.choice; if(s.worknotes!==undefined) worknotesText=s.worknotes||''; }
   if(revealed && !wasRevealed) sendMyVote();
   syncTimer();
   if(currentStory) renderRoom();
@@ -528,6 +550,7 @@ function gatherEstimates(){ const m={}; Object.values(SPRINTS).forEach(sp=>sp.st
 function setStoryPoints(id,pts){ Object.values(SPRINTS).forEach(sp=>sp.stories.forEach(s=>{ if(s.id===id) s.points=pts; })); }
 function updateLiveStatus(){
   const el=document.getElementById('live-status'); if(!el) return;
+  if(demoMode){ el.innerHTML='<span class="dot" style="background:#9b59b6;"></span> 🎮 Demo mode'; return; }
   if(!RT_ENABLED){ el.innerHTML='<span class="dot" style="background:#c9803a;"></span> Offline · realtime not configured'; return; }
   const n = 1 + Object.keys(others).length;
   el.innerHTML=`<span class="dot"></span> Live · ${n} in room`;
@@ -569,12 +592,18 @@ async function dbUpdateSession(id, fields){
 }
 function sessionProgress(){ if(!currentSprint) return {estimated:0,total:0}; const total=currentSprint.stories.length; const estimated=currentSprint.stories.filter(s=>s.points!=null).length; return {estimated,total}; }
 function pushSessionProgress(status){
-  if(!isAdmin || !currentSessionId) return;
+  if(demoMode || !isAdmin || !currentSessionId) return;
   const p=sessionProgress();
   dbUpdateSession(currentSessionId, {estimated:p.estimated, total:p.total, sprint:currentSprintId, status:status||'active'});
 }
 
-const BOTS=[];
+const BOTS=[
+  {n:'Ava M. (demo)', i:'AM', emoji:'🦍', color:'#E24B4A'},
+  {n:'Raj K. (demo)', i:'RK', emoji:'🐦', color:'#378ADD'},
+  {n:'Jo D. (demo)',  i:'JD', emoji:'🐱', color:'#1D9E75'},
+  {n:'Mia P. (demo)', i:'MP', emoji:'🦫', color:'#BA7517'},
+  {n:'Sam T. (demo)', i:'ST', emoji:'🦁', color:'#7F77DD'},
+];
 const DECK=['0','1','2','3','5','8','13','21','?','☕'];
 const EMOJIS=['🐭','🦍','🐱','🐦','🦜','🕊️','🐺','🦫','🦁','🦊','🐼','🦉','🐙','🐯','🦄'];
 const COLORS=['#E24B4A','#D85A30','#BA7517','#639922','#1D9E75','#378ADD','#534AB7','#7F77DD','#D4537E','#5F5E5A'];
@@ -657,6 +686,8 @@ let currentSprint=null, currentStory=null, currentSprintId='s1';
 let currentSessionId=null, currentSessionName='';
 let started=false, revealed=false, myPick=null, submitted=false, facilitatorChoice=null;
 let tieSpeakers=[];
+let worknotesText='';
+let demoMode=false, botIn=[], botTimers=[];
 let selEmoji='🐭', selColor='#E24B4A';
 let timerInt=null, remaining=0, roundDuration=30, roundEndsAt=0, roundId=0, seenRound=0, allDone=false;
 
@@ -782,6 +813,7 @@ function createSessionFromLobby(){
 
 /* ---------- Enter a session (room) ---------- */
 function enterSession(id, sprintId){
+  demoMode=false; botIn=[];
   currentSessionId=id;
   setUrlSession(id);
   isAdmin=isHostOf(id);
@@ -808,6 +840,25 @@ async function fetchSessionMeta(id){
 }
 function updateSessionTitle(){ const el=document.getElementById('session-name'); if(el) el.textContent = currentSessionName || currentSessionId || ''; }
 
+/* ---------- Demo mode (local sandbox with bots) ---------- */
+function startDemo(){
+  if(!me || !me.name){ showIdentity(startDemo); return; }
+  if(chan){ try{ chan.untrack(); chan.unsubscribe(); }catch(e){} chan=null; }
+  demoMode=true; isAdmin=true; currentSessionId='demo'; currentSessionName='Demo session';
+  others={}; revealedVotes={};
+  clearUrlSession();
+  botIn=[]; started=false; revealed=false; currentStory=null; allDone=false;
+  hideLobby();
+  document.getElementById('join').style.display='none';
+  document.getElementById('appbar').style.display='flex';
+  document.getElementById('layout').style.display='grid';
+  updateChip(); updateRoleChip();
+  const sel=document.getElementById('sprint'); if(sel) sel.value='s1';
+  loadSprint();
+  updateLiveStatus(); updateShareUi(); updateSessionTitle();
+  toast('🎮 Demo — you’re the facilitator. Open a story and press Start; the demo bots will vote along.');
+}
+
 /* ---------- Share link ---------- */
 function updateShareUi(){ const btn=document.getElementById('share-btn'); if(btn) btn.style.display = (currentSessionId && isAdmin) ? 'inline-flex' : 'none'; }
 function askShare(link){ const el=document.getElementById('share-link'); if(!el) return; el.value=link; document.getElementById('share-ov').style.display='flex'; }
@@ -819,21 +870,33 @@ function copyShareFromModal(){ const el=document.getElementById('share-link'); e
 function toggleUserMenu(){ const m=document.getElementById('user-menu'); if(!m) return; const show=m.style.display!=='block'; if(show) renderUserMenu(); m.style.display=show?'block':'none'; }
 function closeUserMenu(){ const m=document.getElementById('user-menu'); if(m) m.style.display='none'; }
 const THEMES=[['cream','Cream'],['light','Light'],['dark','Dark'],['midnight','Midnight'],['forest','Forest'],['sunset','Sunset']];
+const THEME_SWATCH={cream:'#efe4cf',light:'#ffffff',dark:'#2b2b2b',midnight:'#121a2b',forest:'#16271d',sunset:'#3a1f2b'};
+function roleLabel(){ return demoMode?'Demo facilitator':(isAdmin?'Facilitator':'Player'); }
 function renderUserMenu(){
   const m=document.getElementById('user-menu'); if(!m) return;
   const cur=document.documentElement.dataset.theme||'cream';
+  const sub = (currentSessionId && !demoMode) ? ' · '+escapeHtml(currentSessionName||currentSessionId) : '';
   m.innerHTML=`
-    <div class="um-head"><div class="avatar" style="width:26px;height:26px;font-size:15px;border-width:1px;background:${me.color}">${me.emoji}</div><span>${escapeHtml(me.name)}</span></div>
-    <button class="um-item" onclick="editIdentity()">🎭 Change name & avatar</button>
-    <div class="um-label">Theme</div>
-    <div class="um-themes">${THEMES.map(([v,l])=>`<button class="um-theme ${v===cur?'sel':''}" onclick="menuSetTheme('${v}')">${l}</button>`).join('')}</div>
-    ${currentSessionId?`<div class="um-sep"></div><button class="um-item" onclick="openShare()">🔗 Share player link</button><button class="um-item" onclick="leaveSession()">🚪 Leave to lobby</button>`:''}`;
+    <div class="um-profile">
+      <div class="avatar" style="width:44px;height:44px;font-size:24px;border-width:2px;background:${me.color}">${me.emoji}</div>
+      <div class="um-profile-txt">
+        <div class="um-name">${escapeHtml(me.name)}</div>
+        <div class="um-role ${isAdmin?'fac':'ply'}">${roleLabel()}${sub}</div>
+      </div>
+    </div>
+    <button class="um-row" onclick="editIdentity()"><span class="um-ico">🎭</span><span class="um-txt">Edit profile</span><span class="um-chev">›</span></button>
+    <div class="um-group-label">Appearance</div>
+    <div class="um-themes">${THEMES.map(([v,l])=>`<button class="um-theme ${v===cur?'sel':''}" onclick="menuSetTheme('${v}')"><span class="um-swatch" style="background:${THEME_SWATCH[v]||'#ccc'}"></span>${l}</button>`).join('')}</div>
+    ${currentSessionId?`<div class="um-sep"></div>
+      ${(!demoMode && isAdmin)?`<button class="um-row" onclick="openShare()"><span class="um-ico">🔗</span><span class="um-txt">Share invite link</span><span class="um-chev">›</span></button>`:''}
+      <button class="um-row danger" onclick="leaveSession()"><span class="um-ico">🚪</span><span class="um-txt">${demoMode?'Exit demo':'Leave to lobby'}</span></button>`:''}`;
 }
 function menuSetTheme(t){ setTheme(t); renderUserMenu(); }
 function leaveSession(){
   closeUserMenu();
   if(chan){ try{ chan.untrack(); chan.unsubscribe(); }catch(e){} chan=null; }
-  others={}; revealedVotes={}; currentStory=null; started=false; revealed=false; isAdmin=false;
+  endRound();
+  demoMode=false; botIn=[]; others={}; revealedVotes={}; currentStory=null; started=false; revealed=false; isAdmin=false; worknotesText=''; allDone=false;
   showLobby();
 }
 document.addEventListener('click', function(e){
@@ -844,12 +907,18 @@ document.addEventListener('click', function(e){
 /* ---------- Participants ---------- */
 function participants(){
   const roster=[ myPresence(), ...Object.values(others) ];
+  if(demoMode){ BOTS.forEach((b,i)=>roster.push({ id:'bot-'+i, name:b.n, initials:b.i, emoji:b.emoji, color:b.color, isAdmin:false, voted:!!botIn[i] })); }
   roster.sort((a,b)=> a.id<b.id?-1:(a.id>b.id?1:0));
   return roster.map(p=>{
     const isMe=p.id===myId;
+    const isBot=typeof p.id==='string' && p.id.indexOf('bot-')===0;
     const voted=isMe?!!submitted:!!p.voted;
     let vote=null;
-    if(revealed){ vote = isMe ? (submitted ? (myPick||null) : null) : (revealedVotes[p.id]!==undefined ? revealedVotes[p.id] : null); }
+    if(revealed){
+      if(isMe) vote=submitted?(myPick||null):null;
+      else if(isBot){ const bi=parseInt(p.id.slice(4)); vote=(currentStory&&botIn[bi])?currentStory.votes[bi]:null; }
+      else vote=revealedVotes[p.id]!==undefined?revealedVotes[p.id]:null;
+    }
     return { id:p.id, name:isMe?(me.name+' (you)'):p.name, initials:p.initials, emoji:p.emoji, color:p.color, isMe, voted, vote };
   });
 }
@@ -884,7 +953,7 @@ function renderStoryList(){
 }
 
 /* ---------- Round control ---------- */
-function endRound(){ stopTimer(); }
+function endRound(){ stopTimer(); botTimers.forEach(clearTimeout); botTimers=[]; }
 /* A round is "locked" from the moment the facilitator starts voting until it's reset
    or written back. While locked, everyone is pinned to the active story. */
 function roundLocked(){ return started; }
@@ -897,7 +966,7 @@ function openStory(idx){
     endRound();
     allDone=false;
     currentStory=st;
-    started=false; revealed=false; myPick=null; submitted=false; facilitatorChoice=null; tieSpeakers=[]; revealedVotes={}; roundEndsAt=0; remaining=0;
+    started=false; revealed=false; myPick=null; submitted=false; facilitatorChoice=null; tieSpeakers=[]; revealedVotes={}; roundEndsAt=0; remaining=0; worknotesText=''; botIn=[];
     roundId++; seenRound=roundId; updatePresence();
     renderStoryList();
     document.getElementById('empty').style.display='none';
@@ -916,15 +985,25 @@ function openStory(idx){
 function startRound(){
   if(!isAdmin) return;
   endRound();
-  started=true; revealed=false; myPick=null; submitted=false; facilitatorChoice=null; tieSpeakers=[]; revealedVotes={};
+  started=true; revealed=false; myPick=null; submitted=false; facilitatorChoice=null; tieSpeakers=[]; revealedVotes={}; worknotesText='';
   roundId++; seenRound=roundId; updatePresence();
   roundEndsAt=Date.now()+roundDuration*1000;
   syncTimer();
+  if(demoMode) scheduleBotVotes();
   renderRoom();
   broadcastState();
   toast('Round started — cast your vote');
 }
 function setDuration(v){ roundDuration=parseInt(v)||30; }
+/* Demo mode: bots trickle in their (pre-scripted) votes on random delays. */
+function scheduleBotVotes(){
+  botTimers.forEach(clearTimeout); botTimers=[]; botIn=BOTS.map(()=>false);
+  const tk=roundId;
+  BOTS.forEach((b,i)=>{
+    const delay=1400+Math.random()*5600;
+    botTimers.push(setTimeout(()=>{ if(tk!==roundId||revealed||!started) return; botIn[i]=true; renderRoom(); maybeAutoReveal(); }, delay));
+  });
+}
 function syncTimer(){
   clearInterval(timerInt); timerInt=null;
   if(started && !revealed && roundEndsAt>Date.now()){
@@ -1014,22 +1093,22 @@ function renderRoom(){
           <div class="res-hd">⚖ Split between ${t.leaders.join(' and ')} — randomly picked to discuss</div>
           <div class="speakers">${spk}</div>
           <div style="font-size:12px; color:var(--warn); margin-bottom:10px;">Let each person explain, then re-vote, or record the agreed number:</div>
-          <div style="margin-bottom:14px;"><button class="btn" onclick="confirmReset()">Re-vote</button></div>
-          <div class="notes-label">Confirmed estimate (facilitator)</div>
+          ${isAdmin?`<div style="margin-bottom:14px;"><button class="btn" onclick="confirmReset()">Re-vote</button></div>`:''}
+          <div class="notes-label">Confirmed estimate ${isAdmin?'(facilitator)':'(set by the facilitator)'}</div>
           <div class="deck" id="cons-deck" style="margin-bottom:12px;"></div>
-          <div class="notes-label">Work notes (posted to ServiceNow)</div>
-          <textarea id="worknotes" placeholder="Discussion outcome, e.g. ${t.leaders[t.leaders.length-1]} agreed — concurrency risk outweighs the smaller estimate."></textarea>
+          <div class="notes-label">Work notes ${isAdmin?'(posted to ServiceNow)':'(facilitator is writing…)'}</div>
+          <textarea id="worknotes" ${isAdmin?'oninput="onWorknotesInput(this.value)"':'readonly'} placeholder="${isAdmin?'Discussion outcome, e.g. '+t.leaders[t.leaders.length-1]+' agreed — concurrency risk outweighs the smaller estimate.':'The facilitator’s notes will appear here…'}">${escapeHtml(worknotesText)}</textarea>
         </div>`;
     } else {
-      facilitatorChoice=t.leaders[0];
+      if(facilitatorChoice==null) facilitatorChoice=t.leaders[0];
       const tallyRow=t.entries.map(([v,c])=>`<span class="pill ${t.leaders[0]===v?'pill-blue':'pill-meta'}">${v}: ${c}</span>`).join(' ');
       resultsHtml=`<div class="results">
           <div class="res-hd">✓ Consensus — agreed ${t.leaders[0]}</div>
           <div class="field-row" style="margin:0 0 12px;">${tallyRow}</div>
-          <div class="notes-label">Confirmed estimate (adjust if the team overrides)</div>
+          <div class="notes-label">Confirmed estimate ${isAdmin?'(adjust if the team overrides)':'(set by the facilitator)'}</div>
           <div class="deck" id="cons-deck" style="margin-bottom:12px;"></div>
-          <div class="notes-label">Work notes (posted to ServiceNow)</div>
-          <textarea id="worknotes" placeholder="Optional context, e.g. Sized ${t.leaders[0]} — flow scope well understood."></textarea>
+          <div class="notes-label">Work notes ${isAdmin?'(posted to ServiceNow)':'(facilitator is writing…)'}</div>
+          <textarea id="worknotes" ${isAdmin?'oninput="onWorknotesInput(this.value)"':'readonly'} placeholder="${isAdmin?'Optional context, e.g. Sized '+t.leaders[0]+' — flow scope well understood.':'The facilitator’s notes will appear here…'}">${escapeHtml(worknotesText)}</textarea>
         </div>`;
     }
   }
@@ -1176,20 +1255,30 @@ function renderConsensusDeck(){
   const el=document.getElementById('cons-deck'); if(!el) return;
   const t=tally();
   const options=t.isTie?t.leaders:DECK.filter(c=>!isNaN(parseInt(c)));
-  el.innerHTML=options.map(c=>`<button class="pcard ${c===facilitatorChoice?'sel':''}" onclick="chooseConfirmed('${c}')">${c}</button>`).join('');
+  el.innerHTML=options.map(c=>`<button class="pcard ${c===facilitatorChoice?'sel':''} ${isAdmin?'':'dim'}" ${isAdmin?'':'disabled'} onclick="chooseConfirmed('${c}')">${c}</button>`).join('');
 }
-function chooseConfirmed(c){ facilitatorChoice=c; renderConsensusDeck(); }
+function chooseConfirmed(c){ if(!isAdmin) return; facilitatorChoice=c; renderConsensusDeck(); broadcastResults(); }
+function onWorknotesInput(v){ if(!isAdmin) return; worknotesText=v; broadcastResults(); }
+/* Live-mirror the facilitator's confirmed estimate + work notes to players (read-only). */
+function broadcastResults(){ if(chan && isAdmin) chan.send({ type:'broadcast', event:'results', payload:{ by:myId, choice:facilitatorChoice, worknotes:worknotesText } }); }
+function applyResults(p){
+  if(!p || p.by===myId || isAdmin) return;
+  facilitatorChoice = p.choice!==undefined ? p.choice : facilitatorChoice;
+  worknotesText = p.worknotes||'';
+  renderConsensusDeck();
+  const ta=document.getElementById('worknotes'); if(ta && document.activeElement!==ta) ta.value=worknotesText;
+}
 function toggleReveal(){
   if(!isAdmin) return;
   if(!revealed){ revealed=true; roundEndsAt=0; stopTimer(); sendMyVote(); }
-  else { revealed=false; facilitatorChoice=null; tieSpeakers=[]; revealedVotes={}; }
-  syncTimer(); renderRoom(); broadcastState();
+  else { revealed=false; facilitatorChoice=null; tieSpeakers=[]; revealedVotes={}; worknotesText=''; }
+  syncTimer(); renderRoom(); broadcastState(); broadcastResults();
 }
 function confirmReset(){ askConfirm("Reset the round? This clears everyone's votes and reshuffles the table.", 'Reset round', ()=>{ resetRound(); }); }
 function resetRound(){
   if(!isAdmin) return;
   endRound();
-  started=false; revealed=false; myPick=null; submitted=false; facilitatorChoice=null; tieSpeakers=[]; revealedVotes={}; roundEndsAt=0; remaining=0;
+  started=false; revealed=false; myPick=null; submitted=false; facilitatorChoice=null; tieSpeakers=[]; revealedVotes={}; roundEndsAt=0; remaining=0; worknotesText=''; botIn=[];
   roundId++; seenRound=roundId; updatePresence();
   syncTimer(); renderRoom(); broadcastState();
   toast('Round reset — press Start to vote again');
