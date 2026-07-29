@@ -68,9 +68,11 @@ everyone who opens it joins the **same** live session. Cards stay anonymous unti
    const SUPABASE_ANON_KEY = 'YOUR-ANON-PUBLIC-KEY';
    ```
    Both are safe to commit — the anon key is a public client key. Commit and redeploy.
-4. (Optional) Set a **team passkey** in the same block — `const TEAM_PASSKEY = '…'`. It's
-   required at **Create & host** and unlocks **super-admin** (closing any active session
-   from the lobby). Set it to `''` to disable the gate.
+4. (Optional) Set two secrets in the same block:
+   - `const TEAM_PASSKEY = '…'` — required at **Create & host** (set `''` to disable the gate).
+   - `const SUPER_PASSKEY = '…'` — the **admin password**. Click the **🔒 Admin** button in
+     the lobby and enter it to unlock **Close** and **Delete** on sessions (and **Clear
+     history**). Click again to lock.
 
 **Session lifecycle.** Sessions stay joinable for **3 days from last activity**, then move
 to a **History** list in the lobby (also where completed/closed sessions land). A

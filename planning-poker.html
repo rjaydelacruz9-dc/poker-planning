@@ -299,6 +299,9 @@
   .lobby-card{background:var(--card); border-radius:18px; box-shadow:0 20px 60px rgba(0,0,0,.25); width:min(680px,92vw); max-height:90vh; overflow:auto; padding:26px 28px;}
   .lobby-top{display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:20px;}
   .lobby-me{display:flex; align-items:center; gap:8px; background:var(--bg); border:1px solid var(--line); border-radius:999px; padding:6px 10px 6px 8px; font-size:13px;}
+  .btn-admin-toggle{background:var(--bg); border:1px solid var(--line); border-radius:999px; padding:7px 12px; font-size:12px; font-weight:600; cursor:pointer; color:var(--ink); white-space:nowrap;}
+  .btn-admin-toggle:hover{border-color:var(--muted);}
+  .btn-admin-toggle.on{background:var(--good,#1D9E75); color:#fff; border-color:var(--good,#1D9E75);}
   .lobby-create{background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:14px;}
   .lobby-demo{display:flex; align-items:center; justify-content:space-between; gap:14px; border:1px dashed var(--line); border-radius:12px; padding:12px 16px; margin-bottom:20px;}
   .lobby-demo button{white-space:nowrap;}
@@ -332,7 +335,10 @@
   <div class="lobby-card">
     <div class="lobby-top">
       <div><h2 style="margin:0;">Sprint Planning Poker</h2><p class="sub" style="margin:4px 0 0;">ServiceNow · Motorhub</p></div>
-      <div class="lobby-me" id="lobby-me"></div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <button class="btn-admin-toggle" id="admin-lock-btn" onclick="toggleAdminUnlock()" title="Enable close &amp; delete controls">🔒 Admin</button>
+        <div class="lobby-me" id="lobby-me"></div>
+      </div>
     </div>
     <div class="lobby-create">
       <h3>Start a new session</h3>
@@ -342,7 +348,7 @@
         <button class="btn btn-primary" onclick="createSessionFromLobby()">Create &amp; host</button>
       </div>
       <div id="lobby-create-err" style="color:var(--warn); font-size:12px; min-height:0; margin-top:6px;"></div>
-      <p class="muted-note">You’ll be the <strong>facilitator</strong>. The passkey gates who can start sessions (and unlocks admin). You start with an empty board — connect ServiceNow to pull stories, then invite your team.</p>
+      <p class="muted-note">You’ll be the <strong>facilitator</strong>. The passkey gates who can start sessions. You start with an empty board — connect ServiceNow to pull stories, then invite your team. (Closing/deleting sessions is behind the <strong>🔒 Admin</strong> button up top.)</p>
     </div>
     <div class="lobby-demo">
       <div>
@@ -499,6 +505,16 @@
   </div>
 </div>
 
+<div class="confirm-ov" id="admin-unlock-ov" style="display:none;">
+  <div class="confirm-card" style="max-width:360px;">
+    <h2 style="margin:0 0 4px; font-size:18px;">🔒 Admin access</h2>
+    <p style="font-size:12px; color:var(--muted); margin:0 0 14px;">Enter the admin password to enable <strong>closing and deleting</strong> sessions.</p>
+    <input type="password" id="admin-unlock-pass" placeholder="Admin password" onkeydown="if(event.key==='Enter')submitAdminUnlock()" style="width:100%;" />
+    <div id="admin-unlock-err" style="color:var(--warn); font-size:12px; margin-top:8px; min-height:14px;"></div>
+    <div class="row" style="margin-top:14px;"><button class="btn" onclick="closeAdminUnlock()">Cancel</button><button class="btn btn-primary" onclick="submitAdminUnlock()">Unlock</button></div>
+  </div>
+</div>
+
 <div class="confirm-ov" id="leave-ov" style="display:none;">
   <div class="confirm-card" style="max-width:440px;">
     <h2 style="margin:0 0 4px; font-size:18px;">Leaving the session</h2>
@@ -524,9 +540,10 @@ const SUPABASE_URL = 'https://vahkbkzqnkxzvwfbsxsy.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_KjJPOQUAn3xQPGvnedOVMw_D1tlTnRA';
 const RT_ENABLED = /^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/i.test(SUPABASE_URL) && !!SUPABASE_ANON_KEY && !SUPABASE_ANON_KEY.includes('YOUR-');
 
-/* Shared team passkey — required to create a session, and unlocks super-admin
-   (closing any active session). CHANGE THIS to your own secret. Set to '' to disable the gate. */
+/* Shared team passkey — required to create a session. Set to '' to disable the gate. */
 const TEAM_PASSKEY = 'motorhub';
+/* Admin password — unlocks the Close/Delete controls (the 🔒 Admin button in the lobby). */
+const SUPER_PASSKEY = 'treetop23';
 /* How long a session stays joinable after its last activity, before it moves to History. */
 const SESSION_TTL_MS = 3*24*60*60*1000;
 function passkeyOk(v){ return !TEAM_PASSKEY || (v||'').trim()===TEAM_PASSKEY; }
@@ -866,6 +883,7 @@ function showLobby(){
   document.getElementById('layout').style.display='none';
   const lob=document.getElementById('lobby'); if(lob) lob.style.display='flex';
   renderLobbyIdentity();
+  updateAdminBtn();
   refreshLobbySessions();
 }
 function updateDemoBanner(){
@@ -952,14 +970,12 @@ function joinExisting(id, sprintId){ enterSession(id, sprintId||undefined); }
 function onPasskeyInput(){
   const v=(document.getElementById('lobby-passkey')||{}).value||'';
   const err=document.getElementById('lobby-create-err');
-  if(TEAM_PASSKEY && v.trim()===TEAM_PASSKEY){ setSuper(true); if(err) err.textContent=''; refreshLobbySessions(); }
-  else if(!v){ if(err) err.textContent=''; }
+  if(!v || (TEAM_PASSKEY && v.trim()===TEAM_PASSKEY)){ if(err) err.textContent=''; }
 }
 function createSessionFromLobby(){
   const pass=(document.getElementById('lobby-passkey')||{}).value||'';
   const err=document.getElementById('lobby-create-err');
   if(!passkeyOk(pass)){ if(err) err.textContent='Incorrect team passkey — ask your admin for it.'; return; }
-  if(TEAM_PASSKEY) setSuper(true);
   const nameInput=document.getElementById('lobby-sess-name');
   const name=((nameInput&&nameInput.value)||'').trim() || 'Planning session';
   const id=newSessionId(name);
@@ -968,6 +984,21 @@ function createSessionFromLobby(){
   dbCreateSession({id, name, sprint:'', facilitator:me.name, estimated:0, total:0, status:'active'});
   enterSession(id, null);
   setTimeout(()=>askShare(playerLink(id)), 350);
+}
+function updateAdminBtn(){ const b=document.getElementById('admin-lock-btn'); if(b){ b.innerHTML=isSuper()?'🔓 Admin on':'🔒 Admin'; b.classList.toggle('on', isSuper()); } }
+function toggleAdminUnlock(){
+  if(isSuper()){ setSuper(false); updateAdminBtn(); refreshLobbySessions(); toast('Admin locked'); return; }
+  const ov=document.getElementById('admin-unlock-ov');
+  document.getElementById('admin-unlock-pass').value='';
+  document.getElementById('admin-unlock-err').textContent='';
+  ov.style.display='flex';
+  setTimeout(()=>{ const el=document.getElementById('admin-unlock-pass'); if(el) el.focus(); }, 50);
+}
+function closeAdminUnlock(){ document.getElementById('admin-unlock-ov').style.display='none'; }
+function submitAdminUnlock(){
+  const v=(document.getElementById('admin-unlock-pass').value||'').trim();
+  if(v===SUPER_PASSKEY){ setSuper(true); closeAdminUnlock(); updateAdminBtn(); refreshLobbySessions(); toast('Admin unlocked — you can now close & delete sessions'); }
+  else{ document.getElementById('admin-unlock-err').textContent='Incorrect password.'; }
 }
 function closeSessionFromLobby(id){
   if(!isSuper()) return;
