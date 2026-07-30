@@ -1,5 +1,5 @@
 {
   "rewrites": [
-    { "source": "/(.*)", "destination": "/planning-poker.html" }
+    { "source": "/((?!api/).*)", "destination": "/planning-poker.html" }
   ]
 }

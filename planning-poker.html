@@ -433,41 +433,15 @@
 
 <div class="confirm-ov" id="admin-ov" style="display:none;">
   <div class="confirm-card" style="max-width:540px; max-height:88vh; overflow:auto;">
-    <h2 style="margin:0 0 4px; font-size:18px;">Admin · ServiceNow integration</h2>
-    <p style="font-size:12px; color:var(--muted); margin:0 0 16px;">Configure the out-of-the-box Table API endpoints and authentication used to read and write stories.</p>
+    <h2 style="margin:0 0 4px; font-size:18px;">ServiceNow integration</h2>
+    <p style="font-size:12px; color:var(--muted); margin:0 0 16px;">Stories are pulled through a secure server proxy. Credentials are never handled in the browser.</p>
 
-    <div class="adm-note">Prototype: credentials entered here are stored in this browser only. In production, proxy requests through a backend and never expose a client secret in the browser.</div>
-
-    <div class="adm-group">
-      <label class="fld" for="adm-instance">Instance base URL</label>
-      <input type="text" id="adm-instance" placeholder="https://acme.service-now.com" oninput="updateAdmPreview()" />
-      <label class="fld" for="adm-get" style="margin-top:12px;">GET stories endpoint</label>
-      <input type="text" id="adm-get" placeholder="/api/now/table/rm_story" oninput="updateAdmPreview()" />
-      <label class="fld" for="adm-patch" style="margin-top:12px;">PATCH story endpoint</label>
-      <input type="text" id="adm-patch" placeholder="/api/now/table/rm_story/{sys_id}" oninput="updateAdmPreview()" />
-      <div style="margin-top:12px;" class="adm-preview" id="adm-preview"></div>
-    </div>
+    <div class="adm-note">🔒 Your ServiceNow instance URL and credentials are configured as <strong>environment variables in Vercel</strong> (server-side) — not here. See the README for the variable names (<code>SN_INSTANCE</code>, <code>SN_USER</code>/<code>SN_PASSWORD</code> or OAuth).</div>
 
     <div class="adm-group">
-      <label class="fld" for="adm-auth">Authentication method</label>
-      <select id="adm-auth" onchange="toggleAuthFields()">
-        <option value="basic">Basic auth</option>
-        <option value="oauth">OAuth 2.0 · client credentials</option>
-      </select>
-      <div id="adm-basic" style="margin-top:12px;">
-        <label class="fld" for="adm-user">Username</label>
-        <input type="text" id="adm-user" placeholder="integration.user" />
-        <label class="fld" for="adm-pass" style="margin-top:12px;">Password</label>
-        <input type="text" id="adm-pass" placeholder="••••••••" />
-      </div>
-      <div id="adm-oauth" style="margin-top:12px; display:none;">
-        <label class="fld" for="adm-token">Token URL</label>
-        <input type="text" id="adm-token" placeholder="/oauth_token.do" />
-        <label class="fld" for="adm-cid" style="margin-top:12px;">Client ID</label>
-        <input type="text" id="adm-cid" placeholder="client id" />
-        <label class="fld" for="adm-secret" style="margin-top:12px;">Client secret</label>
-        <input type="password" id="adm-secret" placeholder="client secret" />
-      </div>
+      <label class="fld" for="adm-query">Story filter — <span style="font-weight:400; color:var(--muted);">optional ServiceNow encoded query (sysparm_query)</span></label>
+      <input type="text" id="adm-query" placeholder="e.g. active=true^sprintLIKESprint 11" />
+      <p style="font-size:11px; color:var(--muted); margin:8px 0 0;">Leave blank to use the server default (<code>SN_QUERY</code>). This is not secret and is safe to set here.</p>
     </div>
 
     <div class="adm-group">
@@ -476,12 +450,12 @@
         <input type="text" id="adm-link" readonly style="flex:1;" />
         <button class="btn" onclick="copyLink()">Copy</button>
       </div>
-      <p style="font-size:11px; color:var(--muted); margin:8px 0 0;">Players join through this link with just a name and avatar — no login required. You’re the facilitator because you created this session.</p>
+      <p style="font-size:11px; color:var(--muted); margin:8px 0 0;">Players join through this link with just a name and avatar — no login required.</p>
     </div>
 
     <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
       <button class="btn" onclick="snTestAuth()">🔌 Test connection</button>
-      <span style="font-size:11px; color:var(--muted);">Verifies the endpoint + auth before pulling.</span>
+      <span style="font-size:11px; color:var(--muted);">Checks the server can reach ServiceNow.</span>
     </div>
     <div class="test-result" id="adm-test"></div>
 
@@ -489,7 +463,7 @@
       <button class="btn" onclick="closeAdmin()">Cancel</button>
       <button class="btn btn-primary" id="adm-pull-btn" onclick="saveAndPull()">⤓ Save &amp; pull stories</button>
     </div>
-    <p style="font-size:10.5px; color:var(--muted); margin:10px 0 0;">⚠️ Prototype: calls run from the browser, so a ServiceNow instance without CORS/a proxy will block them. Credentials are stored in this browser only — never use production secrets here.</p>
+    <p style="font-size:10.5px; color:var(--muted); margin:10px 0 0;">Calls run server-side through <code>/api/servicenow</code> (Vercel function), so credentials stay off the browser and there’s no CORS wall. The proxy is read-only. For production, add real user auth in front of it.</p>
   </div>
 </div>
 
@@ -1636,104 +1610,53 @@ function copyLink(){
 /* ---------- Admin settings ---------- */
 function openAdminPanel(){
   document.getElementById('adm-link').value=sessionLink();
-  document.getElementById('adm-instance').value=cfg.instance;
-  document.getElementById('adm-get').value=cfg.getEndpoint;
-  document.getElementById('adm-patch').value=cfg.patchEndpoint;
-  document.getElementById('adm-auth').value=cfg.auth;
-  document.getElementById('adm-user').value=cfg.basicUser;
-  document.getElementById('adm-pass').value=cfg.basicPass;
-  document.getElementById('adm-token').value=cfg.tokenUrl;
-  document.getElementById('adm-cid').value=cfg.clientId;
-  document.getElementById('adm-secret').value=cfg.clientSecret;
-  toggleAuthFields(); updateAdmPreview();
+  const q=document.getElementById('adm-query'); if(q) q.value=cfg.query||'';
+  const t=document.getElementById('adm-test'); if(t){ t.className='test-result'; t.innerHTML=''; }
   document.getElementById('admin-ov').style.display='flex';
 }
 function closeAdmin(){ document.getElementById('admin-ov').style.display='none'; }
-function toggleAuthFields(){
-  const m=document.getElementById('adm-auth').value;
-  document.getElementById('adm-basic').style.display=m==='basic'?'block':'none';
-  document.getElementById('adm-oauth').style.display=m==='oauth'?'block':'none';
-}
-function updateAdmPreview(){
-  const inst=(document.getElementById('adm-instance').value||'').replace(/\/$/,'');
-  const g=document.getElementById('adm-get').value, p=document.getElementById('adm-patch').value;
-  document.getElementById('adm-preview').innerHTML=`GET&nbsp;&nbsp; ${inst}${g}?sysparm_query=sprint=&lt;sprint_sys_id&gt;<br>PATCH ${inst}${p}`;
-}
-function readAdminForm(){
-  cfg={
-    instance:(document.getElementById('adm-instance').value||SN_INSTANCE).replace(/\/$/,''),
-    getEndpoint:document.getElementById('adm-get').value||'/api/now/table/rm_story',
-    patchEndpoint:document.getElementById('adm-patch').value||'/api/now/table/rm_story/{sys_id}',
-    auth:document.getElementById('adm-auth').value,
-    basicUser:document.getElementById('adm-user').value, basicPass:document.getElementById('adm-pass').value,
-    tokenUrl:document.getElementById('adm-token').value, clientId:document.getElementById('adm-cid').value, clientSecret:document.getElementById('adm-secret').value
-  };
-  save('pp_admin',cfg);
-}
+function readAdminForm(){ const q=document.getElementById('adm-query'); cfg.query=q?q.value:''; save('pp_admin',cfg); }
 function setTestResult(cls,msg){ const el=document.getElementById('adm-test'); if(!el) return; el.className='test-result '+cls; el.innerHTML=msg; }
 
-/* Acquire an Authorization header for the configured auth method. Throws on failure. */
-async function snAuthHeader(){
-  if(cfg.auth==='oauth'){
-    const url=cfg.instance+(cfg.tokenUrl||'/oauth_token.do');
-    const body=new URLSearchParams({grant_type:'client_credentials', client_id:cfg.clientId, client_secret:cfg.clientSecret});
-    const r=await fetch(url,{method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded','Accept':'application/json'}, body});
-    if(!r.ok) throw new Error('Token request failed ('+r.status+')');
-    const j=await r.json(); if(!j.access_token) throw new Error('No access_token in token response');
-    return 'Bearer '+j.access_token;
-  }
-  if(!cfg.basicUser) throw new Error('Enter a username & password');
-  return 'Basic '+btoa(cfg.basicUser+':'+cfg.basicPass);
+/* All ServiceNow calls go through our own server proxy (/api/servicenow), which holds
+   the credentials as Vercel env vars. Nothing sensitive is ever sent from the browser,
+   and server-to-server calls avoid the CORS wall. */
+async function snProxy(action, params){
+  const qs=new URLSearchParams(Object.assign({action}, params||{})).toString();
+  const r=await fetch('/api/servicenow?'+qs, { headers:{ 'Accept':'application/json' } });
+  let j={}; try{ j=await r.json(); }catch(e){}
+  if(!r.ok || j.error) throw new Error(j.error || ('HTTP '+r.status));
+  return j;
 }
 async function snTestAuth(){
-  readAdminForm();
-  if(!/^https?:\/\//.test(cfg.instance)){ setTestResult('err','Enter a valid instance URL (https://…).'); return false; }
-  setTestResult('busy','⏳ Testing connection…');
+  setTestResult('busy','⏳ Testing the server connection…');
   try{
-    const auth=await snAuthHeader();
-    const url=cfg.instance+cfg.getEndpoint+'?sysparm_limit=1&sysparm_fields=number';
-    const r=await fetch(url,{headers:{'Authorization':auth,'Accept':'application/json'}});
-    if(!r.ok) throw new Error('GET failed ('+r.status+(r.status===401?' — check credentials':'')+')');
-    await r.json();
-    setTestResult('ok','✓ Connected — authentication succeeded and the stories endpoint responded.');
+    const j=await snProxy('test');
+    if(j.instance) cfg.instance=j.instance;
+    setTestResult('ok','✓ Connected — the server reached ServiceNow and authentication succeeded.');
     return true;
   }catch(e){
-    const cors=(e&&e.message&&/Failed to fetch/i.test(e.message));
-    setTestResult('err','✗ '+(cors?'Could not reach the instance from the browser. This is usually CORS — ServiceNow must allow this origin, or route calls through a server-side proxy (see README).':escapeHtml(e.message)));
+    setTestResult('err','✗ '+escapeHtml(e.message||e)+' · Check the ServiceNow environment variables in Vercel (see README).');
     return false;
   }
-}
-/* Map a ServiceNow rm_story record to the app's story shape. */
-function mapSnStory(r){
-  const pts=(r.story_points!=null && r.story_points!=='')?(parseInt(r.story_points)||r.story_points):null;
-  return {
-    id:r.number||r.sys_id, sys_id:r.sys_id, t:r.short_description||'(no title)',
-    state:r.state||'', priority:r.priority||'', points:pts,
-    short:r.short_description||'', details:r.description||'', criteria:r.acceptance_criteria||'',
-    ai:'', tags:[], votes:[]
-  };
 }
 async function saveAndPull(){
   readAdminForm();
   const btn=document.getElementById('adm-pull-btn'); if(btn){ btn.disabled=true; btn.textContent='Pulling…'; }
-  setTestResult('busy','⏳ Pulling stories from ServiceNow…');
+  setTestResult('busy','⏳ Pulling stories via the server…');
   try{
-    const auth=await snAuthHeader();
-    const url=cfg.instance+cfg.getEndpoint+'?sysparm_limit=200&sysparm_display_value=true&sysparm_exclude_reference_link=true';
-    const r=await fetch(url,{headers:{'Authorization':auth,'Accept':'application/json'}});
-    if(!r.ok) throw new Error('GET failed ('+r.status+')');
-    const j=await r.json();
-    const rows=(j&&j.result)||[];
-    if(!rows.length){ setTestResult('err','Connected, but the endpoint returned 0 stories. Check the query/table.'); if(btn){btn.disabled=false; btn.textContent='⤓ Save & pull stories';} return; }
-    PULLED={ name:'ServiceNow backlog', release:'', product:cfg.instance.replace(/^https?:\/\//,''), epic:'', stories:rows.map(mapSnStory) };
+    const j=await snProxy('stories', cfg.query?{query:cfg.query}:{});
+    const rows=j.stories||[];
+    if(!rows.length){ setTestResult('err','Connected, but 0 stories were returned. Adjust the story filter below.'); if(btn){btn.disabled=false; btn.textContent='⤓ Save & pull stories';} return; }
+    if(j.instance) cfg.instance=j.instance;
+    PULLED={ name:'ServiceNow backlog', release:'', product:(cfg.instance||'').replace(/^https?:\/\//,''), epic:'', stories:rows };
     currentSprintId='sn'; currentStory=null;
     setTestResult('ok','✓ Pulled '+rows.length+' stories.');
     loadSprint();
     if(isAdmin) broadcastState();
     setTimeout(()=>{ closeAdmin(); toast('Pulled '+rows.length+' stories from ServiceNow'); }, 700);
   }catch(e){
-    const cors=(e&&e.message&&/Failed to fetch/i.test(e.message));
-    setTestResult('err','✗ '+(cors?'Could not reach the instance from the browser (CORS). Route calls through a server-side proxy — see the README.':escapeHtml(e.message)));
+    setTestResult('err','✗ '+escapeHtml(e.message||e));
   }
   if(btn){ btn.disabled=false; btn.textContent='⤓ Save & pull stories'; }
 }

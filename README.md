@@ -40,15 +40,39 @@ dependencies. Open it in a browser to run.
 - **Themes** — Cream (default), Light, Dark, Midnight, Forest, Sunset.
 - **Admin panel** — configure the ServiceNow Table API endpoints and auth (see below).
 
-## Admin / integration settings
+## ServiceNow integration (secure server proxy)
 
-Open the gear (facilitator only). Configure:
+ServiceNow is reached through a **Vercel serverless function** at
+[`api/servicenow.js`](api/servicenow.js) — the browser calls `/api/servicenow`, the
+function calls ServiceNow server-to-server. This keeps credentials **off the browser**
+and sidesteps CORS. The facilitator's gear panel only holds a non-secret story filter and
+the **Test connection** / **Save & pull stories** buttons.
 
-- Instance base URL
-- GET stories endpoint — default `/api/now/table/rm_story`
-- PATCH story endpoint — default `/api/now/table/rm_story/{sys_id}`
-- Auth: **Basic** (username/password) or **OAuth 2.0 client credentials**
-  (token URL, client ID, client secret)
+**Setup — add these in Vercel → Project → Settings → Environment Variables**, then redeploy:
+
+| Variable | Required | Notes |
+|---|---|---|
+| `SN_INSTANCE` | ✅ | e.g. `https://acme.service-now.com` |
+| `SN_AUTH` |  | `basic` (default) or `oauth` |
+| `SN_USER`, `SN_PASSWORD` | for basic | integration user credentials |
+| `SN_CLIENT_ID`, `SN_CLIENT_SECRET` | for oauth | client-credentials grant |
+| `SN_TOKEN_URL` |  | default `/oauth_token.do` |
+| `SN_STORY_PATH` |  | default `/api/now/table/rm_story` |
+| `SN_QUERY` |  | default encoded query, e.g. `active=true^sprintLIKESprint 11` |
+| `SN_PROXY_TOKEN` |  | if set, callers must send a matching `x-proxy-token` header |
+
+Then open the gear → **Test connection** (confirms the server reached ServiceNow) →
+**Save & pull stories**. The pulled backlog is broadcast to everyone in the session.
+
+> **Security note.** Credentials live only in Vercel env vars, never in the client. The
+> proxy is **read-only** (test + list stories). It has no user auth of its own, so anyone
+> who knows the URL can read the story list — fine for an internal tool; put real
+> authentication in front of it (or set `SN_PROXY_TOKEN` + a small auth layer) before
+> exposing anything sensitive. Also add ServiceNow-side rate limits / a least-privilege
+> integration user.
+>
+> **Local dev:** `/api/*` only runs on Vercel (or `vercel dev`); a plain static server
+> returns 404 for it, and the app shows a clear "check env vars" message.
 
 ## Live multiplayer (Supabase Realtime)
 
@@ -124,9 +148,11 @@ the lobby just shows "history isn't set up yet" instead of the team list.
 
 ## ⚠️ Still prototype-grade — before production
 
-- **ServiceNow data + write-back are still mock.** Stories are built-in demo data and
-  `PATCH rm_story/{sys_id}` isn't wired. Real ServiceNow access needs a **server-side
-  proxy** (never expose credentials/secrets in the browser).
+- **ServiceNow reads are live via the proxy; write-back is not wired yet.** Pulling the
+  backlog works server-side (see above). The confirmed estimate + work note are still only
+  composed/logged client-side — wiring `PATCH rm_story/{sys_id}` through the proxy is the
+  next step. The proxy also has no auth of its own (read-only); add real auth before
+  exposing sensitive data.
 - **Facilitator (host) auth is client-side.** The host token lives in the creator's
   browser `localStorage`. It's sturdier than a shared password (nothing to leak, and the
   player link can't grant it), but it isn't server-enforced — a determined user could still
