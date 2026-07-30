@@ -7,7 +7,7 @@
 <style>
   :root{ --radius:10px; }
   html[data-theme="cream"]{
-    --bg:#f4eede; --card:#fffdf7; --ink:#3b352b; --muted:#7a715f; --hint:#a89c85; --line:#e7ddc8;
+    --bg:#f4eede; --card:#fffdf7; --ink:#2f2a22; --muted:#615847; --hint:#8f836c; --line:#e7ddc8;
     --accent:#b5793a; --accent-dark:#6e4416; --accent-soft:#f3e6d3; --appbar:#4a3f2e;
     --felt1:#3f7d5a; --felt2:#2c5c40; --felt-ring:#204630; --felt-ink:#f2fbf5; --felt-sub:#bfe0cd;
     --ai-bg:#efe6f3; --ai-border:#d8c4e6; --ai-ink:#4a2f5c; --ai-accent:#7a4f96;
@@ -15,7 +15,7 @@
     --pill-bg:#efe7d6; --pill-ink:#7a715f;
   }
   html[data-theme="light"]{
-    --bg:#f4f6f9; --card:#ffffff; --ink:#1c2430; --muted:#5f6b7a; --hint:#8a94a3; --line:#e3e8ef;
+    --bg:#f4f6f9; --card:#ffffff; --ink:#141b26; --muted:#4b5665; --hint:#7c8797; --line:#e3e8ef;
     --accent:#185FA5; --accent-dark:#0C447C; --accent-soft:#E6F1FB; --appbar:#0b2f52;
     --felt1:#12684f; --felt2:#0d5340; --felt-ring:#0a4433; --felt-ink:#eafaf3; --felt-sub:#a9d8c8;
     --ai-bg:#EEEDFE; --ai-border:#CECBF6; --ai-ink:#26215C; --ai-accent:#3C3489;
@@ -23,7 +23,7 @@
     --pill-bg:#eef2f7; --pill-ink:#5f6b7a;
   }
   html[data-theme="dark"]{
-    --bg:#0f141a; --card:#1a222c; --ink:#e6ebf1; --muted:#9aa7b5; --hint:#6b7a8a; --line:#2a3542;
+    --bg:#0f141a; --card:#1a222c; --ink:#eef2f7; --muted:#b6c1cd; --hint:#8493a3; --line:#2a3542;
     --accent:#4f9be6; --accent-dark:#bcd6f0; --accent-soft:#16304a; --appbar:#0a0f14;
     --felt1:#14705a; --felt2:#0c4535; --felt-ring:#083528; --felt-ink:#eafaf3; --felt-sub:#8fc7b4;
     --ai-bg:#241f3d; --ai-border:#3c3572; --ai-ink:#d6d1f6; --ai-accent:#b3aaf0;
@@ -31,7 +31,7 @@
     --pill-bg:#232d38; --pill-ink:#9aa7b5;
   }
   html[data-theme="midnight"]{
-    --bg:#0b1020; --card:#141b34; --ink:#e3e8ff; --muted:#9aa2c8; --hint:#6b73a0; --line:#232c4d;
+    --bg:#0b1020; --card:#141b34; --ink:#ecefff; --muted:#b6bce0; --hint:#838bba; --line:#232c4d;
     --accent:#6d7bff; --accent-dark:#b7bdff; --accent-soft:#1a2145; --appbar:#070b18;
     --felt1:#2a2f6a; --felt2:#1a1f4d; --felt-ring:#12163a; --felt-ink:#eaecff; --felt-sub:#b0b6e8;
     --ai-bg:#1f2450; --ai-border:#3a417e; --ai-ink:#cdd2ff; --ai-accent:#9aa2ff;
@@ -39,7 +39,7 @@
     --pill-bg:#1c2444; --pill-ink:#9aa2c8;
   }
   html[data-theme="forest"]{
-    --bg:#0e1613; --card:#17241f; --ink:#e4efe9; --muted:#9bb3a8; --hint:#6c8579; --line:#26372f;
+    --bg:#0e1613; --card:#17241f; --ink:#ecf4ef; --muted:#b2c8bd; --hint:#83998d; --line:#26372f;
     --accent:#3fae7a; --accent-dark:#bfe8d5; --accent-soft:#123227; --appbar:#0a1410;
     --felt1:#1f6b3f; --felt2:#134a2c; --felt-ring:#0d3820; --felt-ink:#e9f7ef; --felt-sub:#a7d6bf;
     --ai-bg:#21322a; --ai-border:#3a5c49; --ai-ink:#cfeadd; --ai-accent:#7fd0a6;
@@ -47,7 +47,7 @@
     --pill-bg:#1d2c25; --pill-ink:#9bb3a8;
   }
   html[data-theme="sunset"]{
-    --bg:#1a1216; --card:#271a20; --ink:#f4e6ec; --muted:#c39dae; --hint:#8f6b7a; --line:#3a2833;
+    --bg:#1a1216; --card:#271a20; --ink:#f9eef3; --muted:#d8bdc9; --hint:#a3808f; --line:#3a2833;
     --accent:#ff7a59; --accent-dark:#ffc4b3; --accent-soft:#3a1f1a; --appbar:#140c10;
     --felt1:#7a3b2e; --felt2:#5a2a20; --felt-ring:#431e16; --felt-ink:#fce8df; --felt-sub:#e2b3a3;
     --ai-bg:#2e1f3a; --ai-border:#4e3a66; --ai-ink:#e7cff4; --ai-accent:#d0a3f4;
@@ -265,6 +265,12 @@
   .room-grid{display:grid; grid-template-columns:minmax(0,1fr) clamp(288px, 24vw, 380px); gap:clamp(16px,2vw,28px); align-items:start;}
   .room-right{position:sticky; top:16px; display:flex; flex-direction:column; gap:14px;}
   .your-card-panel{background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:14px;}
+  .your-card-panel.locked{padding:10px 14px;}
+  .locked-card{display:flex; align-items:center; gap:12px;}
+  .locked-card .pcard.lg{width:46px; height:60px; font-size:20px; opacity:1; cursor:default;}
+  .locked-txt{font-size:13px; font-weight:600; color:var(--good,#1D9E75);}
+  .deck-legend{font-size:10.5px; color:var(--muted); margin-top:8px; line-height:1.5;}
+  .your-card-panel.locked .deck-legend{display:none;}
   .results-panel .results{margin:0;}
   /* Stack when the table can't keep a usable width beside the rail */
   @media(max-width:1024px){ .room-grid{grid-template-columns:1fr;} .room-right{position:static;} }
@@ -688,15 +694,18 @@ function pushSessionProgress(status){
 }
 
 const BOTS=[
-  {n:'Ava M. (demo)', i:'AM', emoji:'🦍', color:'#E24B4A'},
-  {n:'Raj K. (demo)', i:'RK', emoji:'🐦', color:'#378ADD'},
-  {n:'Jo D. (demo)',  i:'JD', emoji:'🐱', color:'#1D9E75'},
-  {n:'Mia P. (demo)', i:'MP', emoji:'🦫', color:'#BA7517'},
-  {n:'Sam T. (demo)', i:'ST', emoji:'🦁', color:'#7F77DD'},
+  {n:'Ava M. (demo)', i:'AM', emoji:'🦍', color:'#F2A5A5'},
+  {n:'Raj K. (demo)', i:'RK', emoji:'🐦', color:'#A9CBEF'},
+  {n:'Jo D. (demo)',  i:'JD', emoji:'🐱', color:'#A6DBC8'},
+  {n:'Mia P. (demo)', i:'MP', emoji:'🦫', color:'#F5D99B'},
+  {n:'Sam T. (demo)', i:'ST', emoji:'🦁', color:'#CAB4E6'},
 ];
-const DECK=['0','1','2','3','5','8','13','21','?','☕'];
+const DECK=['0','1','2','3','5','8','13','21','?','🛑','✂️'];
+/* Tooltips / meaning for the non-numeric cards */
+const CARD_HINT={'?':'Not sure','🛑':'Not ready for development','✂️':'Too big — split this story'};
 const EMOJIS=['🐭','🦍','🐱','🐦','🦜','🕊️','🐺','🦫','🦁','🦊','🐼','🦉','🐙','🐯','🦄'];
-const COLORS=['#E24B4A','#D85A30','#BA7517','#639922','#1D9E75','#378ADD','#534AB7','#7F77DD','#D4537E','#5F5E5A'];
+/* Pastel avatar palette */
+const COLORS=['#F2A5A5','#F7C09A','#F5D99B','#B9DDA6','#A6DBC8','#A9CBEF','#B7B6EA','#CAB4E6','#F0AECE','#C7C3BC'];
 /* Default ServiceNow instance base URL — override in Admin settings */
 const SN_INSTANCE='https://your-instance.service-now.com';
 /* Admin-configurable integration settings (out-of-the-box Table API) */
@@ -771,14 +780,14 @@ const SPRINTS={
 };
 
 /* ---------- State ---------- */
-let me={name:'You', initials:'YOU', emoji:'🐭', color:'#E24B4A'};
+let me={name:'You', initials:'YOU', emoji:'🐭', color:'#F2A5A5'};
 let currentSprint=null, currentStory=null, currentSprintId='s1';
 let currentSessionId=null, currentSessionName='';
 let started=false, revealed=false, myPick=null, submitted=false, facilitatorChoice=null;
 let tieSpeakers=[];
 let worknotesText='';
 let demoMode=false, botIn=[], botTimers=[];
-let selEmoji='🐭', selColor='#E24B4A';
+let selEmoji='🐭', selColor='#F2A5A5';
 let timerInt=null, remaining=0, roundDuration=30, roundEndsAt=0, roundId=0, seenRound=0, allDone=false;
 
 /* ---------- Storage ---------- */
@@ -1359,7 +1368,7 @@ function renderRoom(){
         return `<div class="speaker"><div class="av" style="background:${p.color}">${p.emoji}</div>
           <div><div class="who">${p.name}</div><div class="voted">voted ${sp.value} — share your reasoning</div></div></div>`;}).join('');
       resultsHtml=`<div class="results tie">
-          <div class="res-hd">⚖ Split between ${t.leaders.join(' and ')} — randomly picked to discuss</div>
+          <div class="res-hd">⚖ Randomly picked to explain their pick</div>
           <div class="speakers">${spk}</div>
           <div style="font-size:12px; color:var(--warn); margin-bottom:10px;">Let each person explain, then re-vote, or record the agreed number:</div>
           ${isAdmin?`<div style="margin-bottom:14px;"><button class="btn" onclick="confirmReset()">Re-vote</button></div>`:''}
@@ -1370,10 +1379,7 @@ function renderRoom(){
         </div>`;
     } else {
       if(facilitatorChoice==null) facilitatorChoice=t.leaders[0];
-      const tallyRow=t.entries.map(([v,c])=>`<span class="pill ${t.leaders[0]===v?'pill-blue':'pill-meta'}">${v}: ${c}</span>`).join(' ');
       resultsHtml=`<div class="results">
-          <div class="res-hd">✓ Consensus — agreed ${t.leaders[0]}</div>
-          <div class="field-row" style="margin:0 0 12px;">${tallyRow}</div>
           <div class="notes-label">Confirmed estimate ${isAdmin?'(adjust if the team overrides)':'(set by the facilitator)'}</div>
           <div class="deck" id="cons-deck" style="margin-bottom:12px;"></div>
           <div class="notes-label">Work notes ${isAdmin?'(posted to ServiceNow)':'(facilitator is writing…)'}</div>
@@ -1443,12 +1449,13 @@ function renderRoom(){
             ${stageHtml}
           </div>
           <div class="room-right">
-            <div class="your-card-panel">
+            <div class="your-card-panel" id="your-card-panel">
               <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
                 <div style="font-size:12px; font-weight:700; color:var(--ink);">Your card · Fibonacci</div>
                 <span id="vote-state" class="pill pill-meta"></span>
               </div>
               <div class="deck" id="my-deck"></div>
+              <div class="deck-legend">🛑 not ready for dev · ✂️ too big — split · ? unsure</div>
               <div id="submit-row" style="margin-top:12px;"></div>
             </div>
             ${breakdownHtml}
@@ -1491,18 +1498,26 @@ window.addEventListener('resize',()=>{ if(currentStory) layoutTable(); });
 
 /* ---------- Voter deck ---------- */
 function renderMyDeck(){
-  const locked=!started||submitted||revealed;
-  document.getElementById('my-deck').innerHTML=DECK.map(c=>{
-    const sel=c===myPick;
-    return `<button class="pcard ${sel?'sel':''} ${locked&&!sel?'dim':''}" ${locked?'disabled':''} onclick="pick('${c}')">${c}</button>`;
-  }).join('');
+  const deck=document.getElementById('my-deck');
   const row=document.getElementById('submit-row'), stateEl=document.getElementById('vote-state');
+  const panel=document.getElementById('your-card-panel');
+  /* Minimized locked view after submitting (until reveal) */
+  if(started && submitted && !revealed){
+    if(panel) panel.classList.add('locked');
+    if(deck) deck.innerHTML=`<div class="locked-card"><span class="pcard sel lg">${myPick}</span><span class="locked-txt">🔒 Locked in${CARD_HINT[myPick]?' · '+CARD_HINT[myPick]:''}</span></div>`;
+    if(row) row.innerHTML=`<span style="font-size:12px; color:var(--muted);">Face down until reveal.</span>`;
+    if(stateEl){ stateEl.textContent='Locked · '+myPick; stateEl.className='pill pill-done'; }
+    return;
+  }
+  if(panel) panel.classList.remove('locked');
+  const locked=!started||revealed;
+  if(deck) deck.innerHTML=DECK.map(c=>{
+    const sel=c===myPick; const hint=CARD_HINT[c]?(' title="'+CARD_HINT[c]+'"'):'';
+    return `<button class="pcard ${sel?'sel':''} ${locked&&!sel?'dim':''}"${hint} ${locked?'disabled':''} onclick="pick('${c}')">${c}</button>`;
+  }).join('');
   if(!started){
     if(row) row.innerHTML=`<span style="font-size:12px; color:var(--muted);">Waiting for the facilitator to start the round.</span>`;
     if(stateEl){ stateEl.textContent='Round not started'; stateEl.className='pill pill-meta'; }
-  } else if(submitted){
-    if(row) row.innerHTML=`<span style="font-size:12px; color:var(--good); font-weight:500;">🔒 Vote locked — your card is face down until reveal.</span>`;
-    if(stateEl){ stateEl.textContent='Locked · '+myPick; stateEl.className='pill pill-done'; }
   } else if(revealed){
     if(row) row.innerHTML=`<span style="font-size:12px; color:var(--muted);">Voting is closed for this round.</span>`;
     if(stateEl){ stateEl.textContent=myPick?('Voted '+myPick):'No vote'; stateEl.className='pill pill-meta'; }
@@ -1514,9 +1529,7 @@ function renderMyDeck(){
 function pick(c){ if(!started||submitted||revealed) return; myPick=(myPick===c?null:c); renderMyDeck(); }
 function submitVote(){
   if(!myPick||submitted||revealed||!started) return;
-  askConfirm(`Lock in your vote of ${myPick}? Once submitted you can't change it this round.`, 'Submit vote', ()=>{
-    submitted=true; updatePresence(); renderRoom(); toast('Vote submitted — card face down'); maybeAutoReveal();
-  });
+  submitted=true; updatePresence(); renderRoom(); toast('Vote submitted'); maybeAutoReveal();
 }
 function maybeAutoReveal(){
   if(isAdmin && started && !revealed && allVoted()){
