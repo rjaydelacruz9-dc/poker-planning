@@ -700,9 +700,9 @@ const BOTS=[
   {n:'Mia P. (demo)', i:'MP', emoji:'🦫', color:'#F5D99B'},
   {n:'Sam T. (demo)', i:'ST', emoji:'🦁', color:'#CAB4E6'},
 ];
-const DECK=['0','1','2','3','5','8','13','21','?','🛑','✂️'];
+const DECK=['0','1','2','3','5','8','13','21','🛑','✂️'];
 /* Tooltips / meaning for the non-numeric cards */
-const CARD_HINT={'?':'Not sure','🛑':'Not ready for development','✂️':'Too big — split this story'};
+const CARD_HINT={'🛑':'Not ready for development','✂️':'Too big — split this story'};
 const EMOJIS=['🐭','🦍','🐱','🐦','🦜','🕊️','🐺','🦫','🦁','🦊','🐼','🦉','🐙','🐯','🦄'];
 /* Pastel avatar palette */
 const COLORS=['#F2A5A5','#F7C09A','#F5D99B','#B9DDA6','#A6DBC8','#A9CBEF','#B7B6EA','#CAB4E6','#F0AECE','#C7C3BC'];
@@ -1455,7 +1455,7 @@ function renderRoom(){
                 <span id="vote-state" class="pill pill-meta"></span>
               </div>
               <div class="deck" id="my-deck"></div>
-              <div class="deck-legend">🛑 not ready for dev · ✂️ too big — split · ? unsure</div>
+              <div class="deck-legend">🛑 not ready for dev · ✂️ too big — split</div>
               <div id="submit-row" style="margin-top:12px;"></div>
             </div>
             ${breakdownHtml}
@@ -1501,15 +1501,9 @@ function renderMyDeck(){
   const deck=document.getElementById('my-deck');
   const row=document.getElementById('submit-row'), stateEl=document.getElementById('vote-state');
   const panel=document.getElementById('your-card-panel');
-  /* Minimized locked view after submitting (until reveal) */
-  if(started && submitted && !revealed){
-    if(panel) panel.classList.add('locked');
-    if(deck) deck.innerHTML=`<div class="locked-card"><span class="pcard sel lg">${myPick}</span><span class="locked-txt">🔒 Locked in${CARD_HINT[myPick]?' · '+CARD_HINT[myPick]:''}</span></div>`;
-    if(row) row.innerHTML=`<span style="font-size:12px; color:var(--muted);">Face down until reveal.</span>`;
-    if(stateEl){ stateEl.textContent='Locked · '+myPick; stateEl.className='pill pill-done'; }
-    return;
-  }
-  if(panel) panel.classList.remove('locked');
+  /* Once you've voted, hide the whole card panel to free up the right column. */
+  if(started && submitted){ if(panel) panel.style.display='none'; return; }
+  if(panel) panel.style.display='';
   const locked=!started||revealed;
   if(deck) deck.innerHTML=DECK.map(c=>{
     const sel=c===myPick; const hint=CARD_HINT[c]?(' title="'+CARD_HINT[c]+'"'):'';
